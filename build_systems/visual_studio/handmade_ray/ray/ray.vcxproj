@@ -161,6 +161,10 @@
     <None Include="..\..\..\..\scripts\run.bat" />
     <None Include="..\..\..\..\scripts\startup.bat" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\..\code\ray.h" />
+    <ClInclude Include="..\..\..\..\code\ray_math.h" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
