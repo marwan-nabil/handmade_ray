@@ -22,6 +22,8 @@ typedef i32 b32x;
 
 #include "ray_math.h"
 
+#define ArraySize(arr) (sizeof(arr) / sizeof((arr)[0]))
+
 #pragma pack(push, 1)
 struct bitmap_header
 {
@@ -53,7 +55,9 @@ struct image_u32
 
 struct material
 {
-    v3 Color;
+    f32 Scatter; // 0 pure diffuse/chalky, 1 is pure specular/mirrory
+    v3 EmmitColor;
+    v3 ReflectionColor;
 };
 
 struct plane

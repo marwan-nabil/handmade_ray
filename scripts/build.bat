@@ -1,7 +1,8 @@
 @echo off
 
+if not exist W:\build; mkdir W:\build
 pushd W:\build
-    cl -nologo -Zo -Z7 -FC -Oi -Od -GR- -EHa- -MTd -Gm- -fp:fast -fp:except-^
+    cl -nologo -Zo -Z7 -FC -Oi -O2 -GR- -EHa- -MTd -Gm- -fp:fast -fp:except-^
        -W4 -WX -wd4201 -wd4100 -wd4189 -wd4505 -wd4456^
        -DHANDMADE_WIN32=1 -DHANDMADE_SLOW=1 -DHANDMADE_INTERNAL=1 -D_CRT_SECURE_NO_WARNINGS^
        W:\code\ray.cpp^
