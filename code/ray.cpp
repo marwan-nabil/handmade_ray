@@ -80,10 +80,9 @@ RayCast(world *World, v3 RayOrigin, v3 RayDirection)
     f32 MinHitDistance = 0.001f;
 
     v3 LastHitNormal = {};
-
     v3 Attenuation = V3(1, 1, 1);
 
-    for (u32 RayCount = 0; RayCount < 4; RayCount++)
+    for (u32 RayCount = 0; RayCount < 8; RayCount++)
     {
         f32 HitDistance = F32MAX;
         u32 HitMaterialIndex = 0;
@@ -146,15 +145,15 @@ RayCast(world *World, v3 RayOrigin, v3 RayDirection)
         {
             material HitMaterial = World->Materials[HitMaterialIndex];
             Result += Hadamard(Attenuation, HitMaterial.EmmitColor);
-#if 0
-            f32 CosineAttenuation = Inner(-RayDirection, LastHitNormal);
+            f32 CosineAttenuation = 1.0f;
+#if 1
+            CosineAttenuation = Inner(-RayDirection, LastHitNormal);
             if (CosineAttenuation < 0.0f)
             {
                 CosineAttenuation = 0.0f;
             }
+#endif
             Attenuation = Hadamard(Attenuation, CosineAttenuation * HitMaterial.ReflectionColor);
-#endif            
-            Attenuation = Hadamard(Attenuation, HitMaterial.ReflectionColor);
             RayOrigin += HitDistance * RayDirection;
 
             v3 PureBounce = RayDirection - 2.0f * Inner(RayDirection, LastHitNormal) * LastHitNormal;
@@ -173,37 +172,72 @@ RayCast(world *World, v3 RayOrigin, v3 RayDirection)
     return Result;
 }
 
+internal f32
+ExactLinearToSRGB(f32 Linear)
+{
+    f32 sRGB;
+
+    if (Linear < 0.0f)
+    {
+        Linear = 0.0f;
+    }
+    else if (Linear > 1.0f)
+    {
+        Linear = 1.0f;
+    }
+
+    sRGB = Linear * 12.92f;
+    if (Linear > 0.0031308f)
+    {
+        sRGB = 1.055f * Pow(Linear, 1.0f / 2.4f) - 0.055f;
+    }
+    
+    return sRGB;
+}
+
 int
 main(int ArgCount, char **Arguments)
 {
     printf("Raycasting ...\n");
-    material Materials[5] = {};
-    Materials[0].EmmitColor = V3(74.0f / 255.0f, 101.0f / 255.0f, 129.0f / 255.0f); // sky
-    Materials[0].Scatter = 1;
-    Materials[1].ReflectionColor = V3(0.5f, 0.5f, 0.5f); // plane
-    Materials[1].Scatter = 0.2f;
-    Materials[2].ReflectionColor = V3(0.9f, 0.3f, 0.1f); // sphere 1
-    Materials[2].Scatter = 0.001f;
-    Materials[3].ReflectionColor = V3(0.1f, 0.7f, 0.1f); // sphere 2
-    Materials[3].Scatter = 0.7f;
-    Materials[4].ReflectionColor = V3(0.9f, 0.9f, 0.8f); // sphere 3
-    Materials[4].Scatter = 1.0f;
+    material Materials[6] = {};
+    // sky
+    Materials[0].EmmitColor = V3(0.3f, 0.4f, 0.5f);
+    // plane
+    Materials[1].ReflectionColor = V3(0.5f, 0.5f, 0.5f);
+    // sphere 1
+    Materials[2].ReflectionColor = V3(0.95f, 0.95f, 0.95f);
+    Materials[2].Scatter = 1.0f;
+    // sphere 2
+    Materials[3].EmmitColor = V3(4.0f, 0.0f, 0.0f);
+    // sphere 3
+    Materials[4].ReflectionColor = V3(0.2f, 0.8f, 0.2f);
+    Materials[4].Scatter = 0.7f;
+    // sphere 4
+    Materials[5].ReflectionColor = V3(0.4f, 0.8f, 0.9f);
+    Materials[5].Scatter = 0.85f;
 
     plane Planes[1] = {};
     Planes[0].N = V3(0, 0, 1);
     Planes[0].d = 0;
     Planes[0].MaterialIndex = 1;
 
-    sphere Spheres[3] = {};
+    sphere Spheres[4] = {};
+    // 1
     Spheres[0].P = V3(0, 0, 0);
     Spheres[0].r = 1.0f;
     Spheres[0].MaterialIndex = 2;
-    Spheres[1].P = V3(3, -2, 0);
+    // 2
+    Spheres[1].P = V3(5, -2, 1);
     Spheres[1].r = 1.0f;
     Spheres[1].MaterialIndex = 3;
-    Spheres[2].P = V3(-2, -1, 2);
+    // 3
+    Spheres[2].P = V3(1, -1, 3);
     Spheres[2].r = 1.0f;
     Spheres[2].MaterialIndex = 4;
+    // 4
+    Spheres[3].P = V3(-3, -4, 0);
+    Spheres[3].r = 1.0f;
+    Spheres[3].MaterialIndex = 5;
 
     world World = {};
     World.Materials = Materials;
@@ -213,13 +247,15 @@ main(int ArgCount, char **Arguments)
     World.Spheres = Spheres;
     World.SphereCount = ArraySize(Spheres);
 
-    v3 CameraPosition = V3(0, -10, 1);
+    v3 CameraPosition = V3(4, -10, 5);
     v3 CameraZ = NOZ(CameraPosition);
     v3 CameraX = NOZ(Cross(V3(0, 0, 1), CameraZ));
     v3 CameraY = NOZ(Cross(CameraZ, CameraX));
 
     image_u32 Image = AllocateImage(1280, 720); // 4096, 2048
 
+    f32 HalfPixelWidth = 0.5f / (f32)Image.Width;
+    f32 HalfPixelHeight = 0.5f / (f32)Image.Height;
     f32 FilmDistance = 1.0f;
     f32 FilmWidth = 1.0f;
     f32 FilmHeight = 1.0f;
@@ -246,22 +282,31 @@ main(int ArgCount, char **Arguments)
              X++)
         {
             f32 FilmX = -1.0f + 2.0f * ((f32)X / Image.Width);
-            v3 PositionOnFilm = FilmCenter 
-                + 0.5f * FilmWidth * FilmX * CameraX
-                + 0.5f * FilmHeight * FilmY * CameraY;
-
-            v3 RayOrigin = CameraPosition;
-            v3 RayDirection = NOZ(PositionOnFilm - CameraPosition);
 
             v3 Color = {};
+            
             u32 RaysPerPixel = 16;
             f32 ContributionRatio = 1.0f / (f32)RaysPerPixel;
             for (u32 RayIndex = 0; RayIndex < RaysPerPixel; RayIndex++)
             {
+                f32 OffsetX = FilmX + RandomBilateral() * HalfPixelWidth;
+                f32 OffsetY = FilmY + RandomBilateral() * HalfPixelHeight;
+                v3 PositionOnFilm = FilmCenter
+                    + 0.5f * FilmWidth * OffsetX * CameraX
+                    + 0.5f * FilmHeight * OffsetY * CameraY;
+                v3 RayOrigin = CameraPosition;
+                v3 RayDirection = NOZ(PositionOnFilm - CameraPosition);
+
                 Color += ContributionRatio * RayCast(&World, RayOrigin, RayDirection);
             }
 
-            v4 BMPColor = V4(255.0f * Color, 255.0f);
+            v4 BMPColor = {
+                255.0f * ExactLinearToSRGB(Color.r),
+                255.0f * ExactLinearToSRGB(Color.g),
+                255.0f * ExactLinearToSRGB(Color.b),
+                255.0f
+            };
+
             *Out++ = BGRAPack4x8(BMPColor);
         }
 
