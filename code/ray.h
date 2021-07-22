@@ -1,6 +1,7 @@
 #pragma once
 
 #define internal static
+#define global static
 
 typedef uint8_t u8;
 typedef int8_t i8;
@@ -55,7 +56,7 @@ struct image_u32
 
 struct material
 {
-    f32 Scatter; // 0 pure diffuse/chalky, 1 is pure specular/mirrory
+    f32 Specular; // 0 pure diffuse/chalky, 1 is pure specular/mirrory
     v3 EmmitColor;
     v3 ReflectionColor;
 };
@@ -84,4 +85,26 @@ struct world
 
     u32 SphereCount;
     sphere *Spheres;
+};
+
+struct work_order
+{
+    world *World;
+    image_u32 *Image;
+    u32 MinX;
+    u32 MinY;
+    u32 MaxX;
+    u32 MaxY;
+};
+
+struct work_queue
+{
+    u32 RaysPerPixel;
+    u32 MaxBounceCount;
+    volatile u64 TotalBouncesComputed;
+    volatile u64 TilesDone;
+
+    volatile u64 NextWorkOrderIndex;
+    u32 WorkOrderCount;
+    work_order *WorkOrders;
 };
