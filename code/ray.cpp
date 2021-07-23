@@ -61,17 +61,28 @@ WriteImage(char *OutputFileName, image_u32 Image)
     }
 }
 
-internal f32
-RandomUnilateral()
+internal u32
+XorShift32(random_series *Series)
 {
-    f32 Result = (f32)rand() / (f32)RAND_MAX;
+    u32 X = Series->State;
+    X ^= X << 13;
+    X ^= X >> 17;
+    X ^= X << 5;
+    Series->State = X;
+    return X;
+}
+
+internal f32
+RandomUnilateral(random_series *Series)
+{
+    f32 Result = (f32)XorShift32(Series) / (f32)_UI32_MAX;
     return Result;
 }
 
 internal f32
-RandomBilateral()
+RandomBilateral(random_series *Series)
 {
-    f32 Result = -1.0f + 2.0f * RandomUnilateral();
+    f32 Result = -1.0f + 2.0f * RandomUnilateral(Series);
     return Result;
 }
 
@@ -112,21 +123,149 @@ LockedAdd_ReturnPrevious(volatile u64 *Value, u64 Increment)
     return Result;
 }
 
+struct cast_result
+{
+    u64 BouncesComputed;
+    v3 PixelColor;
+};
+
+internal cast_result
+CastPixelRays(world *World, work_queue *Queue, random_series *ThreadEntropy, 
+             f32 FilmX, f32 FilmY, f32 FilmWidth, f32 FilmHeight, v3 FilmCenter,
+             v3 CameraX, v3 CameraY, v3 CameraPosition,
+             u32 RaysPerPixel, f32 HalfPixelWidth, f32 HalfPixelHeight)
+{
+    cast_result Result = {};
+    f32 RayContributionRatio = 1.0f / (f32)RaysPerPixel;
+
+    for (u32 RayIndex = 0; RayIndex < RaysPerPixel; RayIndex++)
+    {
+        v3 SingleRayColor = {};
+        f32 OffsetX = FilmX + RandomBilateral(ThreadEntropy) * HalfPixelWidth;
+        f32 OffsetY = FilmY + RandomBilateral(ThreadEntropy) * HalfPixelHeight;
+        v3 PositionOnFilm = FilmCenter
+            + 0.5f * FilmWidth * OffsetX * CameraX
+            + 0.5f * FilmHeight * OffsetY * CameraY;
+        v3 RayOrigin = CameraPosition;
+        v3 RayDirection = NOZ(PositionOnFilm - RayOrigin);
+
+        f32 Tolerance = 0.00001f;
+        f32 MinHitDistance = 0.001f;
+        v3 LastHitNormal = {};
+        v3 Attenuation = V3(1, 1, 1);
+        u32 MaxBounces = Queue->MaxBounceCount;
+
+        for (u32 BounceCount = 0; BounceCount < MaxBounces; BounceCount++)
+        {
+            Result.BouncesComputed++;
+            f32 HitDistance = F32MAX;
+            u32 HitMaterialIndex = 0;
+
+            for (u32 PlaneIndex = 0;
+                 PlaneIndex < World->PlaneCount;
+                 PlaneIndex++)
+            {
+                plane Plane = World->Planes[PlaneIndex];
+
+                f32 Denominator = Inner(Plane.N, RayDirection);
+                if (Denominator < -Tolerance || Denominator > Tolerance)
+                {
+                    f32 t = (-Plane.d - Inner(Plane.N, RayOrigin)) / Denominator;
+                    if (t > MinHitDistance && t < HitDistance)
+                    {
+                        HitDistance = t;
+                        HitMaterialIndex = Plane.MaterialIndex;
+                        LastHitNormal = Plane.N;
+                    }
+                }
+            }
+
+            for (u32 SphereIndex = 0;
+                 SphereIndex < World->SphereCount;
+                 SphereIndex++)
+            {
+                sphere Sphere = World->Spheres[SphereIndex];
+
+                v3 SphereRelativeRayOrigin = RayOrigin - Sphere.P;
+
+                f32 a = Inner(RayDirection, RayDirection);
+                f32 b = Inner(RayDirection, SphereRelativeRayOrigin) + Inner(SphereRelativeRayOrigin, RayDirection);
+                f32 c = Inner(SphereRelativeRayOrigin, SphereRelativeRayOrigin) - Sphere.r * Sphere.r;
+
+                f32 Denominator = 2 * a;
+                f32 RootTerm = SquareRoot(b * b - 4.0f * a * c);
+
+                if (RootTerm > Tolerance)
+                {
+                    f32 TPos = (-b + RootTerm) / Denominator;
+                    f32 TNeg = (-b - RootTerm) / Denominator;
+
+                    f32 t = TPos;
+                    if (TNeg > MinHitDistance && TNeg < TPos)
+                    {
+                        t = TNeg;
+                    }
+
+                    if (t > MinHitDistance && t < HitDistance)
+                    {
+                        HitDistance = t;
+                        HitMaterialIndex = Sphere.MaterialIndex;
+                        LastHitNormal = NOZ(HitDistance * RayDirection + SphereRelativeRayOrigin);
+                    }
+                }
+            }
+
+            if (HitMaterialIndex)
+            {
+                material HitMaterial = World->Materials[HitMaterialIndex];
+                SingleRayColor += Hadamard(Attenuation, HitMaterial.EmmitColor);
+
+                f32 CosineAttenuation = 1.0f;
+                CosineAttenuation = Inner(-RayDirection, LastHitNormal);
+                if (CosineAttenuation < 0.0f)
+                {
+                    CosineAttenuation = 0.0f;
+                }
+                Attenuation = Hadamard(Attenuation, CosineAttenuation * HitMaterial.ReflectionColor);
+
+                RayOrigin += HitDistance * RayDirection;
+
+                v3 PureBounce = RayDirection - 2.0f * Inner(RayDirection, LastHitNormal) * LastHitNormal;
+                v3 RandomVector = V3(RandomBilateral(ThreadEntropy), RandomBilateral(ThreadEntropy), RandomBilateral(ThreadEntropy));
+                v3 RandomBounce = NOZ(LastHitNormal + RandomVector);
+                RayDirection = NOZ(Lerp(RandomBounce, HitMaterial.Specular, PureBounce));
+            }
+            else
+            {
+                material HitMaterial = World->Materials[HitMaterialIndex];
+                SingleRayColor += Hadamard(Attenuation, HitMaterial.EmmitColor);
+                break;
+            }
+        }
+
+        Result.PixelColor += RayContributionRatio * SingleRayColor;
+    }
+
+    return Result;
+}
+
 internal b32x
 RenderTile(work_queue *Queue)
 {
     u64 WorkOrderIndex = LockedAdd_ReturnPrevious(&Queue->NextWorkOrderIndex, 1);
-    if (WorkOrderIndex > Queue->WorkOrderCount)
+    if (WorkOrderIndex >= Queue->WorkOrderCount)
     {
         return false;
     }
     work_order *WorkOrder = Queue->WorkOrders + WorkOrderIndex;
+
     image_u32 *Image = WorkOrder->Image;
     world *World = WorkOrder->World;
     u32 XMin = WorkOrder->MinX;
     u32 YMin = WorkOrder->MinY;
     u32 XMax = WorkOrder->MaxX;
     u32 YMax = WorkOrder->MaxY;
+    random_series *ThreadEntropy = &WorkOrder->Entropy;
 
     v3 CameraPosition = V3(6, -10, 4);
     v3 CameraZ = NOZ(CameraPosition);
@@ -151,6 +290,7 @@ RenderTile(work_queue *Queue)
     f32 HalfPixelWidth = 0.5f / (f32)Image->Width;
     f32 HalfPixelHeight = 0.5f / (f32)Image->Height;
     u64 BouncesComputed = 0;
+    cast_result CastResult = {};
 
     for (u32 Y = YMin; Y < YMax; Y++)
     {
@@ -163,116 +303,13 @@ RenderTile(work_queue *Queue)
 
             v3 PixelColor = {};
             u32 RaysPerPixel = Queue->RaysPerPixel;
-            f32 RayContributionRatio = 1.0f / (f32)RaysPerPixel;
 
-            for (u32 RayIndex = 0; RayIndex < RaysPerPixel; RayIndex++)
-            {
-                v3 SingleRayColor = {};
-                f32 OffsetX = FilmX + RandomBilateral() * HalfPixelWidth;
-                f32 OffsetY = FilmY + RandomBilateral() * HalfPixelHeight;
-                v3 PositionOnFilm = FilmCenter
-                    + 0.5f * FilmWidth * OffsetX * CameraX
-                    + 0.5f * FilmHeight * OffsetY * CameraY;
-                v3 RayOrigin = CameraPosition;
-                v3 RayDirection = NOZ(PositionOnFilm - RayOrigin);
+            CastResult = CastPixelRays(World, Queue, ThreadEntropy, FilmX, FilmY, FilmWidth, FilmHeight, FilmCenter,
+                                       CameraX, CameraY, CameraPosition, RaysPerPixel, HalfPixelWidth, HalfPixelHeight);
 
-                f32 Tolerance = 0.00001f;
-                f32 MinHitDistance = 0.001f;
-                v3 LastHitNormal = {};
-                v3 Attenuation = V3(1, 1, 1);
-                u32 MaxBounces = Queue->MaxBounceCount;
+            BouncesComputed += CastResult.BouncesComputed;
+            PixelColor = CastResult.PixelColor;
 
-                for (u32 BounceCount = 0; BounceCount < MaxBounces; BounceCount++)
-                {
-                    BouncesComputed++;
-                    f32 HitDistance = F32MAX;
-                    u32 HitMaterialIndex = 0;
-
-                    for (u32 PlaneIndex = 0;
-                         PlaneIndex < World->PlaneCount;
-                         PlaneIndex++)
-                    {
-                        plane Plane = World->Planes[PlaneIndex];
-
-                        f32 Denominator = Inner(Plane.N, RayDirection);
-                        if (Denominator < -Tolerance || Denominator > Tolerance)
-                        {
-                            f32 t = (-Plane.d - Inner(Plane.N, RayOrigin)) / Denominator;
-                            if (t > MinHitDistance && t < HitDistance)
-                            {
-                                HitDistance = t;
-                                HitMaterialIndex = Plane.MaterialIndex;
-                                LastHitNormal = Plane.N;
-                            }
-                        }
-                    }
-
-                    for (u32 SphereIndex = 0;
-                         SphereIndex < World->SphereCount;
-                         SphereIndex++)
-                    {
-                        sphere Sphere = World->Spheres[SphereIndex];
-
-                        v3 SphereRelativeRayOrigin = RayOrigin - Sphere.P;
-
-                        f32 a = Inner(RayDirection, RayDirection);
-                        f32 b = Inner(RayDirection, SphereRelativeRayOrigin) + Inner(SphereRelativeRayOrigin, RayDirection);
-                        f32 c = Inner(SphereRelativeRayOrigin, SphereRelativeRayOrigin) - Sphere.r * Sphere.r;
-
-                        f32 Denominator = 2 * a;
-                        f32 RootTerm = SquareRoot(b * b - 4.0f * a * c);
-
-                        if (RootTerm > Tolerance)
-                        {
-                            f32 TPos = (-b + RootTerm) / Denominator;
-                            f32 TNeg = (-b - RootTerm) / Denominator;
-
-                            f32 t = TPos;
-                            if (TNeg > MinHitDistance && TNeg < TPos)
-                            {
-                                t = TNeg;
-                            }
-
-                            if (t > MinHitDistance && t < HitDistance)
-                            {
-                                HitDistance = t;
-                                HitMaterialIndex = Sphere.MaterialIndex;
-                                LastHitNormal = NOZ(HitDistance * RayDirection + SphereRelativeRayOrigin);
-                            }
-                        }
-                    }
-
-                    if (HitMaterialIndex)
-                    {
-                        material HitMaterial = World->Materials[HitMaterialIndex];
-                        SingleRayColor += Hadamard(Attenuation, HitMaterial.EmmitColor);
-
-                        f32 CosineAttenuation = 1.0f;
-                        CosineAttenuation = Inner(-RayDirection, LastHitNormal);
-                        if (CosineAttenuation < 0.0f)
-                        {
-                            CosineAttenuation = 0.0f;
-                        }
-                        Attenuation = Hadamard(Attenuation, CosineAttenuation * HitMaterial.ReflectionColor);
-                        
-                        RayOrigin += HitDistance * RayDirection;
-
-                        v3 PureBounce = RayDirection - 2.0f * Inner(RayDirection, LastHitNormal) * LastHitNormal;
-                        v3 RandomVector = V3(RandomBilateral(), RandomBilateral(), RandomBilateral());
-                        v3 RandomBounce = NOZ(LastHitNormal + RandomVector);
-                        RayDirection = NOZ(Lerp(RandomBounce, HitMaterial.Specular, PureBounce));
-                    }
-                    else
-                    {
-                        material HitMaterial = World->Materials[HitMaterialIndex];
-                        SingleRayColor += Hadamard(Attenuation, HitMaterial.EmmitColor);
-                        break;
-                    }
-                }
-
-                PixelColor += RayContributionRatio * SingleRayColor;
-            }
-            
             v4 BMPColor = {
                 255.0f * ExactLinearToSRGB(PixelColor.r),
                 255.0f * ExactLinearToSRGB(PixelColor.g),
@@ -361,10 +398,6 @@ main(int ArgCount, char **Arguments)
     Spheres[3].P = V3(-3, -4, 0);
     Spheres[3].r = 1.0f;
     Spheres[3].MaterialIndex = 5;
-    // 5
-    Spheres[4].P = V3(-1, 0, 2);
-    Spheres[4].r = 1.0f;
-    Spheres[4].MaterialIndex = 6;
 
     world World = {};
     World.Materials = Materials;
@@ -384,14 +417,13 @@ main(int ArgCount, char **Arguments)
     u32 TotalTileCount = TileCountX * TileCountY;
 
     work_queue Queue = {};
-    Queue.MaxBounceCount = 8;
-    Queue.RaysPerPixel = 512;
+    Queue.MaxBounceCount = 4;
+    Queue.RaysPerPixel = 4;
     Queue.WorkOrders = (work_order *)malloc(Queue.WorkOrderCount * sizeof(work_order));
 
     printf("Configuratoin: %d cores rendering %d %dx%d pixel tiles, with %d kbyte/tile.\n", 
            CoreCount, TotalTileCount, TileWidth, TileHeight, TileWidth * TileHeight * 4 / 1024);
     printf("Tracing quality: %d Rays/Pixel, %d Bounces/Ray.\n", Queue.RaysPerPixel, Queue.MaxBounceCount);
-
 
     for (u32 TileY = 0; TileY < TileCountY; TileY++)
     {
@@ -420,6 +452,10 @@ main(int ArgCount, char **Arguments)
             WorkOrder->MinY = MinY;
             WorkOrder->MaxX = MaxX;
             WorkOrder->MaxY = MaxY;
+
+            // TODO: replace with other entropy source
+            random_series Entropy = {TileX * 12875 + TileY * 76534};
+            WorkOrder->Entropy = Entropy;
         }
     }
 
