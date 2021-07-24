@@ -21,9 +21,15 @@ internal image_u32
 AllocateImage(u32 Width, u32 Height)
 {
     image_u32 Result = {};
+
     Result.Width = Width;
     Result.Height = Height;
     Result.Pixels = (u32 *)malloc(GetTotalPixelSize(Result));
+    if (!Result.Pixels)
+    {
+        printf("ERROR: failed to malloc!\n");
+    }
+
     return Result;
 }
 
@@ -417,9 +423,13 @@ main(int ArgCount, char **Arguments)
     u32 TotalTileCount = TileCountX * TileCountY;
 
     work_queue Queue = {};
-    Queue.MaxBounceCount = 4;
-    Queue.RaysPerPixel = 4;
-    Queue.WorkOrders = (work_order *)malloc(Queue.WorkOrderCount * sizeof(work_order));
+    Queue.MaxBounceCount = 8;
+    Queue.RaysPerPixel = 64;
+    Queue.WorkOrders = (work_order *)malloc(TotalTileCount * sizeof(work_order));
+    if (!Queue.WorkOrders)
+    {
+        printf("ERROR: failed to malloc!\n");
+    }
 
     printf("Configuratoin: %d cores rendering %d %dx%d pixel tiles, with %d kbyte/tile.\n", 
            CoreCount, TotalTileCount, TileWidth, TileHeight, TileWidth * TileHeight * 4 / 1024);

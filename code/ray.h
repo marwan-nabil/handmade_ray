@@ -105,12 +105,12 @@ struct work_order
 
 struct work_queue
 {
-    u32 RaysPerPixel;
-    u32 MaxBounceCount;
     volatile u64 TotalBouncesComputed;
     volatile u64 TilesDone;
-
     volatile u64 NextWorkOrderIndex;
+
+    u32 RaysPerPixel;
+    u32 MaxBounceCount;
     u32 WorkOrderCount;
     work_order *WorkOrders;
 };
