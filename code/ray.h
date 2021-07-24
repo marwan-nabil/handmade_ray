@@ -114,3 +114,36 @@ struct work_queue
     u32 WorkOrderCount;
     work_order *WorkOrders;
 };
+
+struct cast_state
+{
+    // in
+    world *World;
+    work_queue *Queue;
+    random_series *ThreadEntropy;
+    f32 FilmX, FilmY, FilmWidth, FilmHeight, FilmDistance;
+    v3 FilmCenter;
+    v3 CameraX, CameraY, CameraZ, CameraPosition;
+    u32 RaysPerPixel;
+    u32 MaxBounceCount;
+    f32 HalfPixelWidth, HalfPixelHeight;
+
+    // out
+    u64 BouncesComputed;
+    v3 PixelColor;
+};
+
+struct lane_v3
+{
+
+};
+
+struct lane_f32
+{
+
+};
+
+struct lane_u32
+{
+
+};
