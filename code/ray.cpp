@@ -118,7 +118,7 @@ XorShift32(random_series *Series)
 internal lane_f32
 RandomUnilateral(random_series *Series)
 {
-    lane_f32 Result = LaneF32FromLaneU32(XorShift32(Series)) / LaneF32FromLaneU32(_UI32_MAX);
+    lane_f32 Result = LaneF32FromLaneU32(XorShift32(Series)) / LaneF32FromF32((f32)_UI32_MAX);
     return Result;
 }
 
@@ -134,27 +134,28 @@ CastPixelRays(cast_state *Input)
 {
     world *World = Input->World;
     random_series EntropyState = Input->ThreadEntropy;
-    lane_u32 RaysPerPixel = Input->RaysPerPixel;
-    lane_u32 MaxBounceCount = Input->MaxBounceCount;
-    lane_f32 HalfPixelWidth = Input->HalfPixelWidth;
-    lane_f32 HalfPixelHeight = Input->HalfPixelHeight;
-    lane_f32 FilmWidth = Input->FilmWidth;
-    lane_f32 FilmHeight = Input->FilmHeight;
+    u32 RaysPerPixel = Input->RaysPerPixel;
+    lane_u32 MaxBounceCount = LaneU32FromU32(Input->MaxBounceCount);
+    lane_f32 HalfPixelWidth = LaneF32FromF32(Input->HalfPixelWidth);
+    lane_f32 HalfPixelHeight = LaneF32FromF32(Input->HalfPixelHeight);
+    lane_f32 FilmWidth = LaneF32FromF32(Input->FilmWidth);
+    lane_f32 FilmHeight = LaneF32FromF32(Input->FilmHeight);
     lane_f32 FilmX = Input->FilmX + HalfPixelWidth;
     lane_f32 FilmY = Input->FilmY + HalfPixelHeight;
-    lane_v3 FilmCenter = Input->FilmCenter;
-    lane_v3 CameraX = Input->CameraX;
-    lane_v3 CameraY = Input->CameraY;
-    lane_v3 CameraZ = Input->CameraZ;
-    lane_v3 CameraPosition = Input->CameraPosition;
+    lane_v3 FilmCenter = LaneV3FromV3(Input->FilmCenter);
+    lane_v3 CameraX = LaneV3FromV3(Input->CameraX);
+    lane_v3 CameraY = LaneV3FromV3(Input->CameraY);
+    lane_v3 CameraZ = LaneV3FromV3(Input->CameraZ);
+    lane_v3 CameraPosition = LaneV3FromV3(Input->CameraPosition);
 
     u32 LaneWidth = SIMD_LANE_WIDTH; // parallel operatoins per lane
     u32 LaneCount = RaysPerPixel / LaneWidth;
     f32 LaneContributionRatio = 1.0f / (f32)RaysPerPixel;
+    Assert((LaneCount * LaneWidth) == RaysPerPixel);
 
-    lane_f32 Tolerance = 0.00001f;
-    lane_f32 MinHitDistance = 0.001f;
-    lane_u32 BouncesComputed = 0;
+    lane_f32 Tolerance = LaneF32FromF32(0.00001f);
+    lane_f32 MinHitDistance = LaneF32FromF32(0.001f);
+    lane_u32 BouncesComputed = LaneU32FromU32(0);
     lane_v3 PixelColor = {};
 
     for (u32 LaneIndex = 0; LaneIndex < LaneCount; LaneIndex++)
@@ -263,7 +264,7 @@ CastPixelRays(cast_state *Input)
             }
         }
 
-        PixelColor += LaneContributionRatio * SingleLaneColor;
+        PixelColor += LaneF32FromF32(LaneContributionRatio) * SingleLaneColor;
     }
 
     Input->BouncesComputed += HorizontalAdd(BouncesComputed);
