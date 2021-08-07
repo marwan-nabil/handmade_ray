@@ -67,31 +67,6 @@ WriteImage(char *OutputFileName, image_u32 Image)
     }
 }
 
-internal u32
-XorShift32(random_series *Series)
-{
-    u32 X = Series->State;
-    X ^= X << 13;
-    X ^= X >> 17;
-    X ^= X << 5;
-    Series->State = X;
-    return X;
-}
-
-internal f32
-RandomUnilateral(random_series *Series)
-{
-    f32 Result = (f32)XorShift32(Series) / (f32)_UI32_MAX;
-    return Result;
-}
-
-internal f32
-RandomBilateral(random_series *Series)
-{
-    f32 Result = -1.0f + 2.0f * RandomUnilateral(Series);
-    return Result;
-}
-
 internal f32
 ExactLinearToSRGB(f32 Linear)
 {
@@ -129,44 +104,87 @@ LockedAdd_ReturnPrevious(volatile u64 *Value, u64 Increment)
     return Result;
 }
 
+internal lane_u32
+XorShift32(random_series *Series)
+{
+    lane_u32 X = Series->State;
+    X ^= X << 13;
+    X ^= X >> 17;
+    X ^= X << 5;
+    Series->State = X;
+    return X;
+}
+
+internal lane_f32
+RandomUnilateral(random_series *Series)
+{
+    lane_f32 Result = LaneF32FromLaneU32(XorShift32(Series)) / LaneF32FromLaneU32(_UI32_MAX);
+    return Result;
+}
+
+internal lane_f32
+RandomBilateral(random_series *Series)
+{
+    lane_f32 Result = -1.0f + 2.0f * RandomUnilateral(Series);
+    return Result;
+}
+
 internal void
 CastPixelRays(cast_state *Input)
 {
-    u32 BouncesComputed = 0;
-    v3 PixelColor = {};
+    world *World = Input->World;
+    random_series EntropyState = Input->ThreadEntropy;
+    lane_u32 RaysPerPixel = Input->RaysPerPixel;
+    lane_u32 MaxBounceCount = Input->MaxBounceCount;
+    lane_f32 HalfPixelWidth = Input->HalfPixelWidth;
+    lane_f32 HalfPixelHeight = Input->HalfPixelHeight;
+    lane_f32 FilmWidth = Input->FilmWidth;
+    lane_f32 FilmHeight = Input->FilmHeight;
+    lane_f32 FilmX = Input->FilmX + HalfPixelWidth;
+    lane_f32 FilmY = Input->FilmY + HalfPixelHeight;
+    lane_v3 FilmCenter = Input->FilmCenter;
+    lane_v3 CameraX = Input->CameraX;
+    lane_v3 CameraY = Input->CameraY;
+    lane_v3 CameraZ = Input->CameraZ;
+    lane_v3 CameraPosition = Input->CameraPosition;
 
-    u32 LaneWidth = 1; // rays per lane
-    u32 LaneCount = Input->RaysPerPixel / LaneWidth;
-    f32 LaneContributionRatio = 1.0f / (f32)LaneCount;
+    u32 LaneWidth = SIMD_LANE_WIDTH; // parallel operatoins per lane
+    u32 LaneCount = RaysPerPixel / LaneWidth;
+    f32 LaneContributionRatio = 1.0f / (f32)RaysPerPixel;
 
     lane_f32 Tolerance = 0.00001f;
     lane_f32 MinHitDistance = 0.001f;
+    lane_u32 BouncesComputed = 0;
+    lane_v3 PixelColor = {};
 
     for (u32 LaneIndex = 0; LaneIndex < LaneCount; LaneIndex++)
     {
         lane_v3 SingleLaneColor = {};
-        lane_f32 OffsetX = Input->FilmX + RandomBilateral(Input->ThreadEntropy) * Input->HalfPixelWidth;
-        lane_f32 OffsetY = Input->FilmY + RandomBilateral(Input->ThreadEntropy) * Input->HalfPixelHeight;
-        lane_v3 PositionOnFilm = Input->FilmCenter
-            + 0.5f * Input->FilmWidth * OffsetX * Input->CameraX
-            + 0.5f * Input->FilmHeight * OffsetY * Input->CameraY;
-        lane_v3 RayOrigin = Input->CameraPosition;
+        lane_f32 OffsetX = FilmX + RandomBilateral(&EntropyState) * HalfPixelWidth;
+        lane_f32 OffsetY = FilmY + RandomBilateral(&EntropyState) * HalfPixelHeight;
+        lane_v3 PositionOnFilm = FilmCenter
+            + 0.5f * FilmWidth * OffsetX * CameraX
+            + 0.5f * FilmHeight * OffsetY * CameraY;
+        lane_v3 RayOrigin = CameraPosition;
         lane_v3 RayDirection = NOZ(PositionOnFilm - RayOrigin);
-
         lane_v3 Attenuation = V3(1, 1, 1);
 
-        for (u32 BounceCount = 0; BounceCount < Input->MaxBounceCount; BounceCount++)
+        lane_u32 LaneMask = 0xffffffff;
+
+        for (u32 BounceCount = 0; BounceCount < MaxBounceCount; BounceCount++)
         {
-            BouncesComputed += LaneWidth;
+            lane_v3 LastHitNormal = {};
+            lane_u32 LaneIncrement = 1;
+            BouncesComputed += (LaneIncrement & LaneMask);
+
             lane_f32 HitDistance = F32MAX;
             lane_u32 HitMaterialIndex = 0;
-            lane_v3 LastHitNormal = {};
 
             for (u32 PlaneIndex = 0;
-                 PlaneIndex < Input->World->PlaneCount;
+                 PlaneIndex < World->PlaneCount;
                  PlaneIndex++)
             {
-                plane Plane = Input->World->Planes[PlaneIndex];
+                plane Plane = World->Planes[PlaneIndex];
                 lane_v3 PlaneNormal = Plane.N;
                 lane_f32 PlaneDistance = Plane.d;
                 lane_u32 PlaneMaterialIndex = Plane.MaterialIndex;
@@ -185,10 +203,10 @@ CastPixelRays(cast_state *Input)
             }
 
             for (u32 SphereIndex = 0;
-                 SphereIndex < Input->World->SphereCount;
+                 SphereIndex < World->SphereCount;
                  SphereIndex++)
             {
-                sphere Sphere = Input->World->Spheres[SphereIndex];
+                sphere Sphere = World->Spheres[SphereIndex];
                 lane_v3 SpherePosition = Sphere.P;
                 lane_f32 SphereRadius = Sphere.r;
                 lane_u32 SphereMaterialIndex = Sphere.MaterialIndex;
@@ -200,52 +218,47 @@ CastPixelRays(cast_state *Input)
                 lane_f32 c = Inner(SphereRelativeRayOrigin, SphereRelativeRayOrigin) - SphereRadius * SphereRadius;
 
                 lane_f32 Denominator = 2.0f * a;
-                lane_f32 RootTerm = SquareRoot(b * b - 4.0f * a * c);
 
+                lane_f32 RootTerm = SquareRoot(b * b - 4.0f * a * c);
                 lane_u32 RootTermCheckMask = (RootTerm > Tolerance);
 
                 lane_f32 TPos = (-b + RootTerm) / Denominator;
                 lane_f32 TNeg = (-b - RootTerm) / Denominator;
-                //ConditionalAssign(&TPos, (-b + RootTerm) / Denominator, RootTermCheckMask); // casey has those non-conditional
-                //ConditionalAssign(&TNeg, (-b - RootTerm) / Denominator, RootTermCheckMask); // casey has those non-conditional
 
                 lane_f32 T = TPos;
-                //ConditionalAssign(&t, TPos); // casey has those non-conditional
-
                 lane_u32 TPickMask = (TNeg > MinHitDistance && TNeg < TPos);
                 ConditionalAssign(&T, TNeg, TPickMask);
-
                 lane_u32 TCheckMask = (T > MinHitDistance && T < HitDistance);
+
                 lane_u32 HitMask = RootTermCheckMask & TCheckMask;
                 ConditionalAssign(&HitDistance, T, HitMask);
                 ConditionalAssign(&HitMaterialIndex, SphereMaterialIndex, HitMask);
                 ConditionalAssign(&LastHitNormal, NOZ(HitDistance * RayDirection + SphereRelativeRayOrigin), HitMask);
             }
 
-            if (HitMaterialIndex)
+            material HitMaterial = World->Materials[HitMaterialIndex];
+            lane_v3 MaterialEmmitColor = HitMaterial.EmmitColor;
+            lane_v3 MaterialReflectionColor = HitMaterial.ReflectionColor;
+            lane_f32 MaterialSpecular = HitMaterial.Specular;
+
+            SingleLaneColor += Hadamard(Attenuation, MaterialEmmitColor);
+
+            LaneMask &= (HitMaterialIndex != 0);
+
+            lane_f32 CosineAttenuation = Max(Inner(-RayDirection, LastHitNormal), 0);
+
+            Attenuation = Hadamard(Attenuation, CosineAttenuation * MaterialReflectionColor);
+
+            RayOrigin += HitDistance * RayDirection;
+
+            lane_v3 PureBounce = RayDirection - 2.0f * Inner(RayDirection, LastHitNormal) * LastHitNormal;
+            lane_v3 RandomVector =
+                V3(RandomBilateral(&EntropyState), RandomBilateral(&EntropyState), RandomBilateral(&EntropyState));
+            lane_v3 RandomBounce = NOZ(LastHitNormal + RandomVector);
+            RayDirection = NOZ(Lerp(RandomBounce, MaterialSpecular, PureBounce));
+
+            if (MaskIsZeroed(LaneMask))
             {
-                material HitMaterial = Input->World->Materials[HitMaterialIndex];
-                SingleLaneColor += Hadamard(Attenuation, HitMaterial.EmmitColor);
-
-                f32 CosineAttenuation = 1.0f;
-                CosineAttenuation = Inner(-RayDirection, LastHitNormal);
-                if (CosineAttenuation < 0.0f)
-                {
-                    CosineAttenuation = 0.0f;
-                }
-                Attenuation = Hadamard(Attenuation, CosineAttenuation * HitMaterial.ReflectionColor);
-
-                RayOrigin += HitDistance * RayDirection;
-
-                v3 PureBounce = RayDirection - 2.0f * Inner(RayDirection, LastHitNormal) * LastHitNormal;
-                v3 RandomVector = V3(RandomBilateral(Input->ThreadEntropy), RandomBilateral(Input->ThreadEntropy), RandomBilateral(Input->ThreadEntropy));
-                v3 RandomBounce = NOZ(LastHitNormal + RandomVector);
-                RayDirection = NOZ(Lerp(RandomBounce, HitMaterial.Specular, PureBounce));
-            }
-            else
-            {
-                material HitMaterial = Input->World->Materials[HitMaterialIndex];
-                SingleLaneColor += Hadamard(Attenuation, HitMaterial.EmmitColor);
                 break;
             }
         }
@@ -253,8 +266,9 @@ CastPixelRays(cast_state *Input)
         PixelColor += LaneContributionRatio * SingleLaneColor;
     }
 
-    Input->PixelColor = PixelColor;
-    Input->BouncesComputed += BouncesComputed;
+    Input->BouncesComputed += HorizontalAdd(BouncesComputed);
+    Input->PixelColor = HorizontalAdd(PixelColor);
+    Input->ThreadEntropy = EntropyState;
 }
 
 internal b32x
@@ -271,7 +285,7 @@ RenderTile(work_queue *Queue)
     cast_state CastState = {};
     CastState.Queue = Queue;
     CastState.World = WorkOrder->World;
-    CastState.ThreadEntropy = &WorkOrder->Entropy;
+    CastState.ThreadEntropy = WorkOrder->Entropy;
 
     CastState.MaxBounceCount = Queue->MaxBounceCount;
     CastState.BouncesComputed = 0;
@@ -280,7 +294,7 @@ RenderTile(work_queue *Queue)
     CastState.HalfPixelWidth = 0.5f / (f32)Image->Width;
     CastState.HalfPixelHeight = 0.5f / (f32)Image->Height;
 
-    CastState.CameraPosition = V3(6, -10, 4);
+    CastState.CameraPosition = V3(6, -10, 1);
     CastState.CameraZ = NOZ(CastState.CameraPosition);
     CastState.CameraX = NOZ(Cross(V3(0, 0, 1), CastState.CameraZ));
     CastState.CameraY = NOZ(Cross(CastState.CameraZ, CastState.CameraX));
@@ -417,8 +431,8 @@ main(int ArgCount, char **Arguments)
     u32 TotalTileCount = TileCountX * TileCountY;
 
     work_queue Queue = {};
-    Queue.MaxBounceCount = 8;
-    Queue.RaysPerPixel = 64;
+    Queue.MaxBounceCount = 4;
+    Queue.RaysPerPixel = 16;
     Queue.WorkOrders = (work_order *)malloc(TotalTileCount * sizeof(work_order));
     if (!Queue.WorkOrders)
     {
@@ -458,7 +472,7 @@ main(int ArgCount, char **Arguments)
             WorkOrder->MaxY = MaxY;
 
             // TODO: replace with another entropy source, this is not random
-            random_series Entropy = {TileX * 12875 + TileY * 76534};
+            random_series Entropy = {TileX * 12875 + TileY * 76534 + 235322};
             WorkOrder->Entropy = Entropy;
         }
     }

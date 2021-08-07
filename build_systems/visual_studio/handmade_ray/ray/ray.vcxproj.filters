@@ -39,5 +39,8 @@
     <ClInclude Include="..\..\..\..\code\ray_math.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\code\ray_lane.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

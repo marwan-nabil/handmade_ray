@@ -22,6 +22,7 @@ typedef i32 b32x;
 #define Tau32 6.28318530717958647692f
 
 #include "ray_math.h"
+#include "ray_lane.h"
 
 #define ArraySize(arr) (sizeof(arr) / sizeof((arr)[0]))
 
@@ -89,7 +90,7 @@ struct world
 
 struct random_series
 {
-    u32 State;
+    lane_u32 State;
 };
 
 struct work_order
@@ -120,7 +121,7 @@ struct cast_state
     // in
     world *World;
     work_queue *Queue;
-    random_series *ThreadEntropy;
+    random_series ThreadEntropy;
     f32 FilmX, FilmY, FilmWidth, FilmHeight, FilmDistance;
     v3 FilmCenter;
     v3 CameraX, CameraY, CameraZ, CameraPosition;
@@ -131,19 +132,4 @@ struct cast_state
     // out
     u64 BouncesComputed;
     v3 PixelColor;
-};
-
-struct lane_v3
-{
-
-};
-
-struct lane_f32
-{
-
-};
-
-struct lane_u32
-{
-
 };
