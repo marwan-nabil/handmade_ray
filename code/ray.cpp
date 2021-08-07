@@ -142,11 +142,11 @@ CastPixelRays(cast_state *Input)
     lane_f32 FilmHeight = LaneF32FromF32(Input->FilmHeight);
     lane_f32 FilmX = Input->FilmX + HalfPixelWidth;
     lane_f32 FilmY = Input->FilmY + HalfPixelHeight;
-    lane_v3 FilmCenter = LaneV3FromV3(Input->FilmCenter);
-    lane_v3 CameraX = LaneV3FromV3(Input->CameraX);
-    lane_v3 CameraY = LaneV3FromV3(Input->CameraY);
-    lane_v3 CameraZ = LaneV3FromV3(Input->CameraZ);
-    lane_v3 CameraPosition = LaneV3FromV3(Input->CameraPosition);
+    lane_v3 FilmCenter = Input->FilmCenter;
+    lane_v3 CameraX = Input->CameraX;
+    lane_v3 CameraY = Input->CameraY;
+    lane_v3 CameraZ = Input->CameraZ;
+    lane_v3 CameraPosition = Input->CameraPosition;
 
     u32 LaneWidth = SIMD_LANE_WIDTH; // parallel operatoins per lane
     u32 LaneCount = RaysPerPixel / LaneWidth;

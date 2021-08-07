@@ -21,8 +21,10 @@ typedef i32 b32x;
 #define Pi32 3.14159265359f
 #define Tau32 6.28318530717958647692f
 
-#include "ray_math.h"
+#define Assert(Expression) {if(!(Expression)){ *(int *)0 = 0; }}
+
 #include "ray_lane.h"
+#include "ray_math.h"
 
 #define ArraySize(arr) (sizeof(arr) / sizeof((arr)[0]))
 
@@ -58,20 +60,20 @@ struct image_u32
 struct material
 {
     f32 Specular; // 0 pure diffuse/chalky, 1 is pure specular/mirrory
-    v3 EmmitColor;
-    v3 ReflectionColor;
+    lane_v3 EmmitColor;
+    lane_v3 ReflectionColor;
 };
 
 struct plane
 {
-    v3 N;
+    lane_v3 N;
     f32 d;
     u32 MaterialIndex;
 };
 
 struct sphere
 {
-    v3 P;
+    lane_v3 P;
     f32 r;
     u32 MaterialIndex;
 };
@@ -123,13 +125,13 @@ struct cast_state
     work_queue *Queue;
     random_series ThreadEntropy;
     f32 FilmX, FilmY, FilmWidth, FilmHeight, FilmDistance;
-    v3 FilmCenter;
-    v3 CameraX, CameraY, CameraZ, CameraPosition;
+    lane_v3 FilmCenter;
+    lane_v3 CameraX, CameraY, CameraZ, CameraPosition;
     u32 RaysPerPixel;
     u32 MaxBounceCount;
     f32 HalfPixelWidth, HalfPixelHeight;
 
     // out
     u64 BouncesComputed;
-    v3 PixelColor;
+    lane_v3 PixelColor;
 };

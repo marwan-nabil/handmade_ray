@@ -105,6 +105,75 @@ operator/(lane_f32 Value, lane_f32 Divisor)
 	return Result;
 }
 
+internal lane_u32
+operator<(lane_f32 A, lane_f32 B)
+{
+	lane_u32 Result;
+	Result.V = _mm_castps_si128(_mm_cmplt_ps(A.V, B.V));
+	return Result;
+}
+
+internal lane_u32
+operator>(lane_f32 A, lane_f32 B)
+{
+	lane_u32 Result;
+	Result.V = _mm_castps_si128(_mm_cmpgt_ps(A.V, B.V));
+	return Result;
+}
+
+internal lane_u32
+operator==(lane_f32 A, lane_f32 B)
+{
+	lane_u32 Result;
+	Result.V = _mm_castps_si128(_mm_cmpeq_ps(A.V, B.V));
+	return Result;
+}
+
+internal lane_u32
+operator!=(lane_f32 A, lane_f32 B)
+{
+	lane_u32 Result;
+	Result.V = _mm_castps_si128(_mm_cmpneq_ps(A.V, B.V));
+	return Result;
+}
+
+internal lane_u32
+operator<=(lane_f32 A, lane_f32 B)
+{
+	lane_u32 Result;
+	Result.V = _mm_castps_si128(_mm_cmple_ps(A.V, B.V));
+	return Result;
+}
+
+internal lane_u32
+operator>=(lane_f32 A, lane_f32 B)
+{
+	lane_u32 Result;
+	Result.V = _mm_castps_si128(_mm_cmpge_ps(A.V, B.V));
+	return Result;
+}
+
+internal lane_f32
+SquareRoot(lane_f32 Value)
+{
+	lane_f32 Result;
+	Result.V = _mm_sqrt_ps(Value.V);
+	return Result;
+}
+
+internal void
+ConditionalAssign(lane_f32 *Destination, lane_f32 Source, lane_u32 Mask)
+{
+	__m128 MaskPS = _mm_cvtepi32_ps(Mask.V);
+	Destination->V = 
+		_mm_or_ps
+		(
+			_mm_andnot_ps(MaskPS, Destination->V),
+			_mm_and_ps(MaskPS, Source.V)
+		);
+}
+
+
 
 
 
@@ -142,6 +211,14 @@ operator&(lane_u32 LHS, lane_u32 RHS)
 }
 
 internal lane_u32
+AndNot(lane_u32 Mask, lane_u32 Destination)
+{
+	lane_u32 Result;
+	Result.V = _mm_andnot_si128(Mask.V, Destination.V);
+	return Result;
+}
+
+internal lane_u32
 operator|(lane_u32 LHS, lane_u32 RHS)
 {
 	lane_u32 Result;
@@ -166,17 +243,6 @@ internal void
 ConditionalAssign(lane_f32 *Destination, lane_f32 Source, lane_u32 Mask)
 {
 	ConditionalAssign((u32 *)Destination, *(u32 *)&Source, Mask);
-
-	//u32 Result = (~Mask & *(u32 *)Destination) | (Mask & *(u32 *)&Source);
-	//*Destination = *(f32 *)&Result;
-}
-
-internal void
-ConditionalAssign(lane_v3 *Destination, lane_v3 Source, lane_u32 Mask)
-{
-	ConditionalAssign(&Destination->x, Source.x, Mask);
-	ConditionalAssign(&Destination->y, Source.y, Mask);
-	ConditionalAssign(&Destination->z, Source.z, Mask);
 }
 
 internal lane_f32
@@ -274,6 +340,13 @@ operator-(f32 A, lane_f32 B)
 }
 
 internal lane_f32
+operator-(lane_f32 B)
+{
+	lane_f32 Result = 0 - B;
+	return Result;
+}
+
+internal lane_f32
 operator*(lane_f32 A, f32 B)
 {
 	lane_f32 Result = A * LaneF32FromF32(B);
@@ -340,8 +413,6 @@ operator/=(lane_f32 &LHS, lane_f32 RHS)
 
 
 
-
-
 lane_u32 &
 lane_u32::operator=(u32 B)
 {
@@ -370,27 +441,70 @@ operator|=(lane_u32 &LHS, lane_u32 RHS)
 	return LHS;
 }
 
+internal lane_u32
+operator>(lane_f32 A, f32 B)
+{
+	lane_u32 Result = A > LaneF32FromF32(B);
+	return Result;
+}
+
+internal lane_u32
+operator>(f32 A, lane_f32 B)
+{
+	lane_u32 Result = LaneF32FromF32(A) > B;
+	return Result;
+}
+
+internal lane_u32
+operator<(lane_f32 A, f32 B)
+{
+	lane_u32 Result = A < LaneF32FromF32(B);
+	return Result;
+}
+
+internal lane_u32
+operator<(f32 A, lane_f32 B)
+{
+	lane_u32 Result = LaneF32FromF32(A) < B;
+	return Result;
+}
 
 
 
 
 
 internal lane_v3
-LaneV3FromV3(v3 Value)
+operator*(lane_v3 A, lane_f32 B)
 {
 	lane_v3 Result;
-	Result.x = Value.x;
-	Result.y = Value.y;
-	Result.z = Value.z;
+	Result.x = A.x * B;
+	Result.y = A.y * B;
+	Result.z = A.z * B;
 	return Result;
 }
 
 internal lane_v3
-operator+(lane_v3 A, lane_v3 B)
+operator*(lane_f32 A, lane_v3 B)
 {
-	lane_v3 Result;
-
+	lane_v3 Result = B * A;
 	return Result;
+}
+
+
+
+
+internal void
+ConditionalAssign(lane_u32 *Destination, lane_u32 Source, lane_u32 Mask)
+{
+	*Destination = AndNot(Mask, *Destination) | (Mask & Source);
 }
 
 #endif
+
+internal void
+ConditionalAssign(lane_v3 *Destination, lane_v3 Source, lane_u32 Mask)
+{
+	ConditionalAssign(&Destination->x, Source.x, Mask);
+	ConditionalAssign(&Destination->y, Source.y, Mask);
+	ConditionalAssign(&Destination->z, Source.z, Mask);
+}
