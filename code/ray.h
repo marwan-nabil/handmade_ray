@@ -60,8 +60,8 @@ struct image_u32
 struct material
 {
     f32 Specular; // 0 pure diffuse/chalky, 1 is pure specular/mirrory
-    v3 EmmitColor;
     v3 ReflectionColor;
+    v3 EmmitColor;
 };
 
 struct plane

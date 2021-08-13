@@ -1,6 +1,6 @@
 #pragma once
 
-#define SIMD_LANE_WIDTH 4
+#define SIMD_LANE_WIDTH 1
 
 struct v3
 {
@@ -72,6 +72,15 @@ LaneU32FromU32(u32 Value)
 	Result.V = _mm_set1_epi32(Value);
 	return Result;
 }
+
+internal lane_u32
+LaneU32FromU32(u32 A, u32 B, u32 C, u32 D)
+{
+	lane_u32 Result;
+	Result.V = _mm_setr_epi32(A, B, C, D);
+	return Result;
+}
+
 
 
 
@@ -166,7 +175,12 @@ operator&(lane_u32 Mask, lane_f32 A)
 	return Result;
 }
 
-
+internal b32x
+MaskIsZeroed(lane_u32 LaneMask)
+{
+	int Mask = _mm_movemask_epi8(LaneMask.V);
+	return (Mask == 0);
+}
 
 
 
@@ -297,6 +311,23 @@ operator!=(lane_u32 A, lane_u32 B)
 	return Result;
 }
 
+internal u64
+HorizontalAdd(lane_u32 A)
+{
+	u32 *V = (u32 *)&A.V;
+	u64 Result = (u64)V[0] + (u64)V[1] + (u64)V[2] + (u64)V[3];
+	return Result;
+}
+
+internal f32
+HorizontalAdd(lane_f32 A)
+{
+	f32 *V = (f32 *)&A.V;
+	f32 Result = V[0] + V[1] + V[2] + V[3];
+	return Result;
+}
+
+
 #elif (SIMD_LANE_WIDTH == 1)
 
 typedef u32 lane_u32;
@@ -366,6 +397,58 @@ LaneF32FromLaneU32(lane_u32 Value)
 	return Result;
 }
 
+internal lane_f32
+LaneF32FromF32(f32 Value)
+{
+	return Value;
+}
+
+internal lane_v3
+LaneV3FromV3(v3 A)
+{
+	return A;
+}
+
+internal lane_u32
+LaneU32FromU32(u32 A)
+{
+	return A;
+}
+
+internal lane_u32
+LaneU32FromU32(u32 A, u32 B, u32 C, u32 D)
+{
+	return A;
+}
+
+internal lane_f32
+GatherF32_(void *BasePointer, u32 Stride, lane_u32 GatherIndices)
+{
+	return *(f32 *)((f32 *)BasePointer + GatherIndices * Stride);
+}
+
+internal lane_v3
+GatherV3_(void *BasePointer, u32 Stride, lane_u32 GatherIndices)
+{
+	lane_v3 Result;
+	Result.x = GatherF32_((f32 *)BasePointer + 0, Stride, GatherIndices);
+	Result.y = GatherF32_((f32 *)BasePointer + 1, Stride, GatherIndices);
+	Result.z = GatherF32_((f32 *)BasePointer + 2, Stride, GatherIndices);
+	return Result;
+}
+
+internal lane_v3
+operator&(lane_u32 Mask, lane_v3 A)
+{
+	return (Mask ? A : v3{0.0f, 0.0f, 0.0f});
+}
+
+internal v3
+ExtractFirstLane(lane_v3 A)
+{
+	return A;
+}
+
 #else
 #error "you have to set SIMD_LANE_WIDTH"
 #endif
@@ -386,7 +469,7 @@ struct lane_v3
 internal lane_f32
 operator+(lane_f32 A, f32 B)
 {
-	lane_f32 Result = A + LaneF32FromF32((u32)B);
+	lane_f32 Result = A + LaneF32FromF32(B);
 	return Result;
 }
 
@@ -599,7 +682,15 @@ operator&(lane_u32 Mask, lane_v3 A)
 	return Result;
 }
 
-
+internal v3
+ExtractFirstLane(lane_v3 A)
+{
+	v3 Result;
+	Result.x = *(f32 *)&A.x;
+	Result.y = *(f32 *)&A.y;
+	Result.z = *(f32 *)&A.z;
+	return Result;
+}
 
 
 
@@ -617,7 +708,6 @@ ConditionalAssign(lane_u32 *Destination, lane_u32 Source, lane_u32 Mask)
 #define GatherF32(BasePointer, GatherIndices, Member) GatherF32_(&(BasePointer)->Member, sizeof(*(BasePointer)), GatherIndices)
 #define GatherV3(BasePointer, GatherIndices, Member) GatherV3_(&(BasePointer)->Member, sizeof(*(BasePointer)), GatherIndices)
 
-
 internal void
 ConditionalAssign(lane_v3 *Destination, lane_v3 Source, lane_u32 Mask)
 {
@@ -626,30 +716,12 @@ ConditionalAssign(lane_v3 *Destination, lane_v3 Source, lane_u32 Mask)
 	ConditionalAssign(&Destination->z, Source.z, Mask);
 }
 
-internal b32x
-MaskIsZeroed(lane_u32 LaneMask)
-{
-
-}
-
-internal u32
-HorizontalAdd(lane_u32 A)
-{
-
-}
-
-internal f32
-HorizontalAdd(lane_f32 A)
-{
-
-}
-
-internal v3
-HorizontalAdd(lane_v3 A)
-{
-	v3 Result;
-	Result.x = HorizontalAdd(A.x);
-	Result.y = HorizontalAdd(A.y);
-	Result.z = HorizontalAdd(A.z);
-	return Result;
-}
+//internal v3
+//HorizontalAdd(lane_v3 A)
+//{
+//	v3 Result;
+//	Result.x = HorizontalAdd(A.x);
+//	Result.y = HorizontalAdd(A.y);
+//	Result.z = HorizontalAdd(A.z);
+//	return Result;
+//}

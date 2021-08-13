@@ -282,6 +282,11 @@ RenderTile(work_queue *Queue)
     work_order *WorkOrder = Queue->WorkOrders + WorkOrderIndex;
     image_u32 *Image = WorkOrder->Image;
 
+    lane_v3 CameraPosition = V3(6, -10, 1);
+    lane_v3 CameraZ = NOZ(CameraPosition);
+    lane_v3 CameraX = NOZ(Cross(V3(0, 0, 1), CameraZ));
+    lane_v3 CameraY = NOZ(Cross(CameraZ, CameraX));
+
     cast_state CastState = {};
     CastState.Queue = Queue;
     CastState.World = WorkOrder->World;
@@ -294,13 +299,13 @@ RenderTile(work_queue *Queue)
     CastState.HalfPixelWidth = 0.5f / (f32)Image->Width;
     CastState.HalfPixelHeight = 0.5f / (f32)Image->Height;
 
-    CastState.CameraPosition = V3(6, -10, 1);
-    CastState.CameraZ = NOZ(CastState.CameraPosition);
-    CastState.CameraX = NOZ(Cross(V3(0, 0, 1), CastState.CameraZ));
-    CastState.CameraY = NOZ(Cross(CastState.CameraZ, CastState.CameraX));
+    CastState.CameraPosition = ExtractFirstLane(CameraPosition);
+    CastState.CameraZ = ExtractFirstLane(CameraZ);
+    CastState.CameraX = ExtractFirstLane(CameraX);
+    CastState.CameraY = ExtractFirstLane(CameraY);
 
     CastState.FilmDistance = 1.0f;
-    CastState.FilmCenter = CastState.CameraPosition - CastState.FilmDistance * CastState.CameraZ;
+    CastState.FilmCenter = ExtractFirstLane(CameraPosition - CastState.FilmDistance * CameraZ);
     CastState.FilmWidth = 1.0f;
     CastState.FilmHeight = 1.0f;
     if (Image->Width > Image->Height)
@@ -324,14 +329,17 @@ RenderTile(work_queue *Queue)
 
             CastPixelRays(&CastState);
 
-            v4 BMPColor = {
-                255.0f * ExactLinearToSRGB(CastState.PixelColor.r),
-                255.0f * ExactLinearToSRGB(CastState.PixelColor.g),
-                255.0f * ExactLinearToSRGB(CastState.PixelColor.b),
-                255.0f
-            };
+            f32 R = 255.0f * ExactLinearToSRGB(CastState.PixelColor.x);
+            f32 G = 255.0f * ExactLinearToSRGB(CastState.PixelColor.y);
+            f32 B = 255.0f * ExactLinearToSRGB(CastState.PixelColor.z);
+            f32 A = 255.0f;
 
-            *Out++ = BGRAPack4x8(BMPColor);
+            u32 Result = ((RoundF32ToU32(A) << 24) |
+                          (RoundF32ToU32(R) << 16) |
+                          (RoundF32ToU32(G) << 8) |
+                          (RoundF32ToU32(B) << 0));
+
+            *Out++ = Result;
         }
     }
 
@@ -370,48 +378,33 @@ main(int ArgCount, char **Arguments)
 {
     printf("Raycasting ...\n");
 
-    material Materials[7] = {};
-    // sky
-    Materials[0].EmmitColor = V3(0.3f, 0.4f, 0.5f);
-    // plane
-    Materials[1].ReflectionColor = V3(0.5f, 0.5f, 0.5f);
-    // sphere 1
-    Materials[2].ReflectionColor = V3(0.95f, 0.95f, 0.95f);
-    Materials[2].Specular = 1.0f;
-    // sphere 2
-    Materials[3].EmmitColor = V3(4.0f, 0.0f, 0.0f);
-    // sphere 3
-    Materials[4].ReflectionColor = V3(0.2f, 0.8f, 0.2f);
-    Materials[4].Specular = 0.7f;
-    // sphere 4
-    Materials[5].ReflectionColor = V3(0.4f, 0.8f, 0.9f);
-    Materials[5].Specular = 0.85f;
-    // sphere 5
-    Materials[6].ReflectionColor = V3(0.25f, 0.8f, 0.3f);
-    Materials[6].Specular = 0.9f;
+    material Materials[7] = {
+        // sky 
+        {0, {}, {0.3f, 0.4f, 0.5f}},
+        // plane
+        {0, {0.5f, 0.5f, 0.5f}, {}},
+        // sphere 1
+        {1.0f, {0.95f, 0.95f, 0.95f}, {}},
+        // sphere 2
+        {0.0f, {}, {4.0f, 0.0f, 0.0f}},
+        // sphere 3
+        {0.7f, {0.2f, 0.8f, 0.2f}, {}},
+        // sphere 4
+        {0.85f, {0.4f, 0.8f, 0.9f}, {}},
+        // sphere 5
+        {0.9f, {0.25f, 0.8f, 0.3f}, {}}
+    };
 
-    plane Planes[1] = {};
-    Planes[0].N = V3(0, 0, 1);
-    Planes[0].d = 0;
-    Planes[0].MaterialIndex = 1;
+    plane Planes[1] = {
+        {{0, 0, 1}, 0, 1}
+    };
 
-    sphere Spheres[4] = {};
-    // 1
-    Spheres[0].P = V3(0, 0, 0);
-    Spheres[0].r = 2.0f;
-    Spheres[0].MaterialIndex = 2;
-    // 2
-    Spheres[1].P = V3(5, -2, 1);
-    Spheres[1].r = 1.0f;
-    Spheres[1].MaterialIndex = 3;
-    // 3
-    Spheres[2].P = V3(1, -1, 3);
-    Spheres[2].r = 1.0f;
-    Spheres[2].MaterialIndex = 4;
-    // 4
-    Spheres[3].P = V3(-3, -4, 0);
-    Spheres[3].r = 1.0f;
-    Spheres[3].MaterialIndex = 5;
+    sphere Spheres[4] = {
+        {{0, 0, 0}, 2.0f, 2},
+        {{5, -2, 1}, 1.0f, 3},
+        {{1, -1 ,3}, 1.0f, 4},
+        {{-3, -4, 0}, 1.0f, 5}
+    };
 
     world World = {};
     World.Materials = Materials;
@@ -439,8 +432,8 @@ main(int ArgCount, char **Arguments)
         printf("ERROR: failed to malloc!\n");
     }
 
-    printf("Configuratoin: %d cores rendering %d %dx%d pixel tiles, with %d kbyte/tile.\n", 
-           CoreCount, TotalTileCount, TileWidth, TileHeight, TileWidth * TileHeight * 4 / 1024);
+    printf("Configuratoin: %d cores with %d-wide lane operations rendering %d %dx%d pixel tiles, with %d kbyte/tile.\n", 
+           CoreCount, SIMD_LANE_WIDTH, TotalTileCount, TileWidth, TileHeight, TileWidth * TileHeight * 4 / 1024);
     printf("Tracing quality: %d Rays/Pixel, %d Bounces/Ray.\n", Queue.RaysPerPixel, Queue.MaxBounceCount);
 
     for (u32 TileY = 0; TileY < TileCountY; TileY++)
@@ -472,7 +465,14 @@ main(int ArgCount, char **Arguments)
             WorkOrder->MaxY = MaxY;
 
             // TODO: replace with another entropy source, this is not random
-            random_series Entropy = {TileX * 12875 + TileY * 76534 + 235322};
+            random_series Entropy = {
+                LaneU32FromU32(
+                    TileX * 12875 + TileY * 76534 + 484453,
+                    TileX * 43367 + TileY * 33498 + 897542,
+                    TileX * 39624 + TileY * 61239 + 543653,
+                    TileX * 74250 + TileY * 98340 + 856832
+                )
+            };
             WorkOrder->Entropy = Entropy;
         }
     }
