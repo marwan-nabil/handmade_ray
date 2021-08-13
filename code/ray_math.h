@@ -4,7 +4,7 @@
 //              real number stuff
 /******************************************************************/
 inline u32
-RoundReal32ToUInt32(f32 F)
+RoundF32ToU32(f32 F)
 {
     u32 Result = (u32)(F + 0.5f);
     return(Result);
@@ -339,29 +339,47 @@ Lerp(lane_v3 A, f32 t, lane_v3 B)
 //              Color stuff
 /******************************************************************/
 
-inline v4
-Linear1ToSRGB255(v4 C)
+//inline v4
+//Linear1ToSRGB255(v4 C)
+//{
+//    v4 Result;
+//
+//    f32 One255 = 255.0f;
+//
+//    Result.r = One255 * SquareRoot(C.r);
+//    Result.g = One255 * SquareRoot(C.g);
+//    Result.b = One255 * SquareRoot(C.b);
+//    Result.a = One255 * C.a;
+//
+//    return(Result);
+//}
+//
+//inline u32
+//BGRAPack4x8(v4 Unpacked)
+//{
+//    u32 Result = ((RoundF32ToU32(Unpacked.a) << 24) |
+//                  (RoundF32ToU32(Unpacked.r) << 16) |
+//                  (RoundF32ToU32(Unpacked.g) << 8) |
+//                  (RoundF32ToU32(Unpacked.b) << 0));
+//
+//    return(Result);
+//}
+
+inline lane_v3
+LaneV3(lane_f32 X, lane_f32 Y, lane_f32 Z)
 {
-    v4 Result;
+    lane_v3 Result;
 
-    f32 One255 = 255.0f;
-
-    Result.r = One255 * SquareRoot(C.r);
-    Result.g = One255 * SquareRoot(C.g);
-    Result.b = One255 * SquareRoot(C.b);
-    Result.a = One255 * C.a;
+    Result.x = X;
+    Result.y = Y;
+    Result.z = Z;
 
     return(Result);
 }
 
-inline u32
-BGRAPack4x8(v4 Unpacked)
+inline lane_v3
+Lerp(lane_v3 A, lane_f32 t, lane_v3 B)
 {
-    u32 Result = ((RoundReal32ToUInt32(Unpacked.a) << 24) |
-                  (RoundReal32ToUInt32(Unpacked.r) << 16) |
-                  (RoundReal32ToUInt32(Unpacked.g) << 8) |
-                  (RoundReal32ToUInt32(Unpacked.b) << 0));
-
+    lane_v3 Result = (1.0f - t) * A + t * B;
     return(Result);
 }
-

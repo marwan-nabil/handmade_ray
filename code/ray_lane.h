@@ -2,6 +2,12 @@
 
 #define SIMD_LANE_WIDTH 4
 
+struct v3
+{
+	f32 x, y, z;
+};
+
+
 #if (SIMD_LANE_WIDTH == 8)
 
 #include <intrin.h>
@@ -31,7 +37,6 @@ struct lane_f32
 	__m128 V;
 	lane_f32 &operator=(f32);
 };
-
 
 
 
@@ -154,6 +159,18 @@ operator>=(lane_f32 A, lane_f32 B)
 }
 
 internal lane_f32
+operator&(lane_u32 Mask, lane_f32 A)
+{
+	lane_f32 Result;
+	Result.V = _mm_and_ps(_mm_castsi128_ps(Mask.V), A.V);
+	return Result;
+}
+
+
+
+
+
+internal lane_f32
 SquareRoot(lane_f32 Value)
 {
 	lane_f32 Result;
@@ -173,10 +190,55 @@ ConditionalAssign(lane_f32 *Destination, lane_f32 Source, lane_u32 Mask)
 		);
 }
 
+inline lane_f32
+Min(lane_f32 A, lane_f32 B)
+{
+	lane_f32 Result;
+	Result.V = _mm_min_ps(A.V, B.V);
+	return Result;
+}
+
+inline lane_f32
+Max(lane_f32 A, lane_f32 B)
+{
+	lane_f32 Result;
+	Result.V = _mm_max_ps(A.V, B.V);
+	return Result;
+}
+
+inline lane_f32
+Clamp01(lane_f32 Value)
+{
+	lane_f32 Result = Min(Max(Value, LaneF32FromF32(0.0f)), LaneF32FromF32(1.0f));
+	return Result;
+}
+
+internal lane_f32
+GatherF32_(void *BasePointer, u32 Stride, lane_u32 GatherIndices)
+{
+	lane_f32 Result;
+	u32 *V = (u32 *)&GatherIndices.V;
+	Result.V = _mm_setr_ps
+	(
+		*(f32 *)((u8 *)BasePointer + V[0] * Stride),
+		*(f32 *)((u8 *)BasePointer + V[1] * Stride),
+		*(f32 *)((u8 *)BasePointer + V[2] * Stride),
+		*(f32 *)((u8 *)BasePointer + V[3] * Stride)
+	);
+	return Result;
+}
 
 
 
 
+
+internal lane_u32
+operator+(lane_u32 A, lane_u32 B)
+{
+	lane_u32 Result;
+	Result.V = _mm_add_epi32(A.V, B.V);
+	return Result;
+}
 
 internal lane_u32
 operator<<(lane_u32 Value, u32 ShiftAmount)
@@ -223,6 +285,15 @@ operator|(lane_u32 LHS, lane_u32 RHS)
 {
 	lane_u32 Result;
 	Result.V = _mm_or_si128(LHS.V, RHS.V);
+	return Result;
+}
+
+internal lane_u32
+operator!=(lane_u32 A, lane_u32 B)
+{
+	lane_u32 Result;
+	// Note(Marwan): probably buggy
+	Result.V = _mm_xor_si128(_mm_cmpeq_epi32(A.V, B.V), _mm_setzero_si128());
 	return Result;
 }
 
@@ -307,6 +378,7 @@ struct lane_v3
 	lane_f32 y;
 	lane_f32 z;
 };
+
 
 
 
@@ -442,6 +514,13 @@ operator|=(lane_u32 &LHS, lane_u32 RHS)
 }
 
 internal lane_u32
+operator+=(lane_u32 &LHS, lane_u32 RHS)
+{
+	LHS = LHS + RHS;
+	return LHS;
+}
+
+internal lane_u32
 operator>(lane_f32 A, f32 B)
 {
 	lane_u32 Result = A > LaneF32FromF32(B);
@@ -490,6 +569,40 @@ operator*(lane_f32 A, lane_v3 B)
 	return Result;
 }
 
+internal lane_v3
+LaneV3FromV3(v3 A)
+{
+	lane_v3 Result;
+	Result.x = LaneF32FromF32(A.x);
+	Result.y = LaneF32FromF32(A.y);
+	Result.z = LaneF32FromF32(A.z);
+	return Result;
+}
+
+internal lane_v3
+GatherV3_(void *BasePointer, u32 Stride, lane_u32 GatherIndices)
+{
+	lane_v3 Result;
+	Result.x = GatherF32_((f32 *)BasePointer + 0, Stride, GatherIndices);
+	Result.y = GatherF32_((f32 *)BasePointer + 1, Stride, GatherIndices);
+	Result.z = GatherF32_((f32 *)BasePointer + 2, Stride, GatherIndices);
+	return Result;
+}
+
+internal lane_v3
+operator&(lane_u32 Mask, lane_v3 A)
+{
+	lane_v3 Result;
+	Result.x = Mask & A.x;
+	Result.y = Mask & A.y;
+	Result.z = Mask & A.z;
+	return Result;
+}
+
+
+
+
+
 
 
 
@@ -501,10 +614,42 @@ ConditionalAssign(lane_u32 *Destination, lane_u32 Source, lane_u32 Mask)
 
 #endif
 
+#define GatherF32(BasePointer, GatherIndices, Member) GatherF32_(&(BasePointer)->Member, sizeof(*(BasePointer)), GatherIndices)
+#define GatherV3(BasePointer, GatherIndices, Member) GatherV3_(&(BasePointer)->Member, sizeof(*(BasePointer)), GatherIndices)
+
+
 internal void
 ConditionalAssign(lane_v3 *Destination, lane_v3 Source, lane_u32 Mask)
 {
 	ConditionalAssign(&Destination->x, Source.x, Mask);
 	ConditionalAssign(&Destination->y, Source.y, Mask);
 	ConditionalAssign(&Destination->z, Source.z, Mask);
+}
+
+internal b32x
+MaskIsZeroed(lane_u32 LaneMask)
+{
+
+}
+
+internal u32
+HorizontalAdd(lane_u32 A)
+{
+
+}
+
+internal f32
+HorizontalAdd(lane_f32 A)
+{
+
+}
+
+internal v3
+HorizontalAdd(lane_v3 A)
+{
+	v3 Result;
+	Result.x = HorizontalAdd(A.x);
+	Result.y = HorizontalAdd(A.y);
+	Result.z = HorizontalAdd(A.z);
+	return Result;
 }

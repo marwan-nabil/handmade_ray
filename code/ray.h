@@ -60,20 +60,20 @@ struct image_u32
 struct material
 {
     f32 Specular; // 0 pure diffuse/chalky, 1 is pure specular/mirrory
-    lane_v3 EmmitColor;
-    lane_v3 ReflectionColor;
+    v3 EmmitColor;
+    v3 ReflectionColor;
 };
 
 struct plane
 {
-    lane_v3 N;
+    v3 N;
     f32 d;
     u32 MaterialIndex;
 };
 
 struct sphere
 {
-    lane_v3 P;
+    v3 P;
     f32 r;
     u32 MaterialIndex;
 };
@@ -125,13 +125,13 @@ struct cast_state
     work_queue *Queue;
     random_series ThreadEntropy;
     f32 FilmX, FilmY, FilmWidth, FilmHeight, FilmDistance;
-    lane_v3 FilmCenter;
-    lane_v3 CameraX, CameraY, CameraZ, CameraPosition;
+    v3 FilmCenter;
+    v3 CameraX, CameraY, CameraZ, CameraPosition;
     u32 RaysPerPixel;
     u32 MaxBounceCount;
     f32 HalfPixelWidth, HalfPixelHeight;
 
     // out
     u64 BouncesComputed;
-    lane_v3 PixelColor;
+    v3 PixelColor;
 };

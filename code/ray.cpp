@@ -135,18 +135,18 @@ CastPixelRays(cast_state *Input)
     world *World = Input->World;
     random_series EntropyState = Input->ThreadEntropy;
     u32 RaysPerPixel = Input->RaysPerPixel;
-    lane_u32 MaxBounceCount = LaneU32FromU32(Input->MaxBounceCount);
+    u32 MaxBounceCount = Input->MaxBounceCount;
     lane_f32 HalfPixelWidth = LaneF32FromF32(Input->HalfPixelWidth);
     lane_f32 HalfPixelHeight = LaneF32FromF32(Input->HalfPixelHeight);
     lane_f32 FilmWidth = LaneF32FromF32(Input->FilmWidth);
     lane_f32 FilmHeight = LaneF32FromF32(Input->FilmHeight);
     lane_f32 FilmX = Input->FilmX + HalfPixelWidth;
     lane_f32 FilmY = Input->FilmY + HalfPixelHeight;
-    lane_v3 FilmCenter = Input->FilmCenter;
-    lane_v3 CameraX = Input->CameraX;
-    lane_v3 CameraY = Input->CameraY;
-    lane_v3 CameraZ = Input->CameraZ;
-    lane_v3 CameraPosition = Input->CameraPosition;
+    lane_v3 FilmCenter = LaneV3FromV3(Input->FilmCenter);
+    lane_v3 CameraX = LaneV3FromV3(Input->CameraX);
+    lane_v3 CameraY = LaneV3FromV3(Input->CameraY);
+    lane_v3 CameraZ = LaneV3FromV3(Input->CameraZ);
+    lane_v3 CameraPosition = LaneV3FromV3(Input->CameraPosition);
 
     u32 LaneWidth = SIMD_LANE_WIDTH; // parallel operatoins per lane
     u32 LaneCount = RaysPerPixel / LaneWidth;
@@ -170,31 +170,31 @@ CastPixelRays(cast_state *Input)
         lane_v3 RayDirection = NOZ(PositionOnFilm - RayOrigin);
         lane_v3 Attenuation = V3(1, 1, 1);
 
-        lane_u32 LaneMask = 0xffffffff;
+        lane_u32 LaneMask = LaneU32FromU32(0xffffffff);
 
         for (u32 BounceCount = 0; BounceCount < MaxBounceCount; BounceCount++)
         {
             lane_v3 LastHitNormal = {};
-            lane_u32 LaneIncrement = 1;
+            lane_u32 LaneIncrement = LaneU32FromU32(1);
             BouncesComputed += (LaneIncrement & LaneMask);
 
-            lane_f32 HitDistance = F32MAX;
-            lane_u32 HitMaterialIndex = 0;
+            lane_f32 HitDistance = LaneF32FromF32(F32MAX);
+            lane_u32 HitMaterialIndex = LaneU32FromU32(0);
 
             for (u32 PlaneIndex = 0;
                  PlaneIndex < World->PlaneCount;
                  PlaneIndex++)
             {
                 plane Plane = World->Planes[PlaneIndex];
-                lane_v3 PlaneNormal = Plane.N;
-                lane_f32 PlaneDistance = Plane.d;
-                lane_u32 PlaneMaterialIndex = Plane.MaterialIndex;
+                lane_v3 PlaneNormal = LaneV3FromV3(Plane.N);
+                lane_f32 PlaneDistance = LaneF32FromF32(Plane.d);
+                lane_u32 PlaneMaterialIndex = LaneU32FromU32(Plane.MaterialIndex);
 
                 lane_f32 Denominator = Inner(PlaneNormal, RayDirection);
-                lane_u32 DenomCheckMask = (Denominator < -Tolerance || Denominator > Tolerance);
+                lane_u32 DenomCheckMask = (Denominator < -Tolerance | Denominator > Tolerance);
 
                 lane_f32 T = (-PlaneDistance - Inner(PlaneNormal, RayOrigin)) / Denominator;
-                lane_u32 TCheckMask = (T > MinHitDistance && T < HitDistance);
+                lane_u32 TCheckMask = (T > MinHitDistance & T < HitDistance);
 
                 lane_u32 HitMask = TCheckMask & DenomCheckMask;
 
@@ -208,9 +208,9 @@ CastPixelRays(cast_state *Input)
                  SphereIndex++)
             {
                 sphere Sphere = World->Spheres[SphereIndex];
-                lane_v3 SpherePosition = Sphere.P;
-                lane_f32 SphereRadius = Sphere.r;
-                lane_u32 SphereMaterialIndex = Sphere.MaterialIndex;
+                lane_v3 SpherePosition = LaneV3FromV3(Sphere.P);
+                lane_f32 SphereRadius = LaneF32FromF32(Sphere.r);
+                lane_u32 SphereMaterialIndex = LaneU32FromU32(Sphere.MaterialIndex);
 
                 lane_v3 SphereRelativeRayOrigin = RayOrigin - SpherePosition;
 
@@ -227,9 +227,9 @@ CastPixelRays(cast_state *Input)
                 lane_f32 TNeg = (-b - RootTerm) / Denominator;
 
                 lane_f32 T = TPos;
-                lane_u32 TPickMask = (TNeg > MinHitDistance && TNeg < TPos);
+                lane_u32 TPickMask = (TNeg > MinHitDistance & TNeg < TPos);
                 ConditionalAssign(&T, TNeg, TPickMask);
-                lane_u32 TCheckMask = (T > MinHitDistance && T < HitDistance);
+                lane_u32 TCheckMask = (T > MinHitDistance & T < HitDistance);
 
                 lane_u32 HitMask = RootTermCheckMask & TCheckMask;
                 ConditionalAssign(&HitDistance, T, HitMask);
@@ -237,16 +237,15 @@ CastPixelRays(cast_state *Input)
                 ConditionalAssign(&LastHitNormal, NOZ(HitDistance * RayDirection + SphereRelativeRayOrigin), HitMask);
             }
 
-            material HitMaterial = World->Materials[HitMaterialIndex];
-            lane_v3 MaterialEmmitColor = HitMaterial.EmmitColor;
-            lane_v3 MaterialReflectionColor = HitMaterial.ReflectionColor;
-            lane_f32 MaterialSpecular = HitMaterial.Specular;
+            lane_v3 MaterialEmmitColor = LaneMask & GatherV3(World->Materials, HitMaterialIndex, EmmitColor);
+            lane_v3 MaterialReflectionColor = GatherV3(World->Materials, HitMaterialIndex, ReflectionColor);
+            lane_f32 MaterialSpecular = GatherF32(World->Materials, HitMaterialIndex, Specular);
 
             SingleLaneColor += Hadamard(Attenuation, MaterialEmmitColor);
 
-            LaneMask &= (HitMaterialIndex != 0);
+            LaneMask &= (HitMaterialIndex != LaneU32FromU32(0));
 
-            lane_f32 CosineAttenuation = Max(Inner(-RayDirection, LastHitNormal), 0);
+            lane_f32 CosineAttenuation = Max(Inner(-RayDirection, LastHitNormal), LaneF32FromF32(0.0f));
 
             Attenuation = Hadamard(Attenuation, CosineAttenuation * MaterialReflectionColor);
 
@@ -254,7 +253,7 @@ CastPixelRays(cast_state *Input)
 
             lane_v3 PureBounce = RayDirection - 2.0f * Inner(RayDirection, LastHitNormal) * LastHitNormal;
             lane_v3 RandomVector =
-                V3(RandomBilateral(&EntropyState), RandomBilateral(&EntropyState), RandomBilateral(&EntropyState));
+                LaneV3(RandomBilateral(&EntropyState), RandomBilateral(&EntropyState), RandomBilateral(&EntropyState));
             lane_v3 RandomBounce = NOZ(LastHitNormal + RandomVector);
             RayDirection = NOZ(Lerp(RandomBounce, MaterialSpecular, PureBounce));
 
