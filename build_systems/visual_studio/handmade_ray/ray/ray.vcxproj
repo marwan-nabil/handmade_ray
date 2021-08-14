@@ -162,8 +162,14 @@
     <None Include="..\..\..\..\scripts\startup.bat" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\..\..\code\base.h" />
     <ClInclude Include="..\..\..\..\code\ray.h" />
     <ClInclude Include="..\..\..\..\code\ray_lane.h" />
+    <ClInclude Include="..\..\..\..\code\ray_lane_1.h" />
+    <ClInclude Include="..\..\..\..\code\ray_lane_4.h" />
+    <ClInclude Include="..\..\..\..\code\ray_lane_8.h" />
+    <ClInclude Include="..\..\..\..\code\ray_lane_not1.h" />
+    <ClInclude Include="..\..\..\..\code\ray_lane_shared.h" />
     <ClInclude Include="..\..\..\..\code\ray_math.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

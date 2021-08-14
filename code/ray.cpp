@@ -8,7 +8,11 @@
 
 #include <Windows.h>
 
+#include "base.h"
 #include "ray.h"
+#include "ray_math.h"
+#include "ray_lane.h"
+
 
 internal u32
 GetTotalPixelSize(image_u32 Image)
@@ -168,7 +172,7 @@ CastPixelRays(cast_state *Input)
             + 0.5f * FilmHeight * OffsetY * CameraY;
         lane_v3 RayOrigin = CameraPosition;
         lane_v3 RayDirection = NOZ(PositionOnFilm - RayOrigin);
-        lane_v3 Attenuation = V3(1, 1, 1);
+        lane_v3 Attenuation = LaneV3(1, 1, 1);
 
         lane_u32 LaneMask = LaneU32FromU32(0xffffffff);
 
@@ -191,10 +195,10 @@ CastPixelRays(cast_state *Input)
                 lane_u32 PlaneMaterialIndex = LaneU32FromU32(Plane.MaterialIndex);
 
                 lane_f32 Denominator = Inner(PlaneNormal, RayDirection);
-                lane_u32 DenomCheckMask = (Denominator < -Tolerance | Denominator > Tolerance);
+                lane_u32 DenomCheckMask = (Denominator < -Tolerance) | (Denominator > Tolerance);
 
                 lane_f32 T = (-PlaneDistance - Inner(PlaneNormal, RayOrigin)) / Denominator;
-                lane_u32 TCheckMask = (T > MinHitDistance & T < HitDistance);
+                lane_u32 TCheckMask = (T > MinHitDistance) & (T < HitDistance);
 
                 lane_u32 HitMask = TCheckMask & DenomCheckMask;
 
@@ -227,9 +231,9 @@ CastPixelRays(cast_state *Input)
                 lane_f32 TNeg = (-b - RootTerm) / Denominator;
 
                 lane_f32 T = TPos;
-                lane_u32 TPickMask = (TNeg > MinHitDistance & TNeg < TPos);
+                lane_u32 TPickMask = (TNeg > MinHitDistance) & (TNeg < TPos);
                 ConditionalAssign(&T, TNeg, TPickMask);
-                lane_u32 TCheckMask = (T > MinHitDistance & T < HitDistance);
+                lane_u32 TCheckMask = (T > MinHitDistance) & (T < HitDistance);
 
                 lane_u32 HitMask = RootTermCheckMask & TCheckMask;
                 ConditionalAssign(&HitDistance, T, HitMask);
@@ -282,9 +286,9 @@ RenderTile(work_queue *Queue)
     work_order *WorkOrder = Queue->WorkOrders + WorkOrderIndex;
     image_u32 *Image = WorkOrder->Image;
 
-    lane_v3 CameraPosition = V3(6, -10, 1);
+    lane_v3 CameraPosition = LaneV3(6, -10, 1);
     lane_v3 CameraZ = NOZ(CameraPosition);
-    lane_v3 CameraX = NOZ(Cross(V3(0, 0, 1), CameraZ));
+    lane_v3 CameraX = NOZ(Cross(LaneV3(0, 0, 1), CameraZ));
     lane_v3 CameraY = NOZ(Cross(CameraZ, CameraX));
 
     cast_state CastState = {};
@@ -305,7 +309,7 @@ RenderTile(work_queue *Queue)
     CastState.CameraY = ExtractFirstLane(CameraY);
 
     CastState.FilmDistance = 1.0f;
-    CastState.FilmCenter = ExtractFirstLane(CameraPosition - CastState.FilmDistance * CameraZ);
+    CastState.FilmCenter = CastState.CameraPosition - CastState.FilmDistance * CastState.CameraZ;
     CastState.FilmWidth = 1.0f;
     CastState.FilmHeight = 1.0f;
     if (Image->Width > Image->Height)

@@ -1,7 +1,9 @@
 #pragma once
 
+#include "base.h"
+
 /******************************************************************/
-//              real number stuff
+//              f32 stuff
 /******************************************************************/
 inline u32
 RoundF32ToU32(f32 F)
@@ -60,188 +62,51 @@ V2(f32 X, f32 Y)
 }
 
 /******************************************************************/
-//              V3 stuff
+//              v3 stuff
 /******************************************************************/
 
-inline lane_v3
-V3(f32 X, f32 Y, f32 Z)
+struct v3
 {
-    lane_v3 Result;
+    f32 x, y, z;
+};
 
-    Result.x = X;
-    Result.y = Y;
-    Result.z = Z;
-
-    return(Result);
-}
-
-inline lane_v3
-V3(v2 XY, f32 Z)
+inline v3
+operator+(v3 A, v3 B)
 {
-    lane_v3 Result;
-
-    Result.x = XY.x;
-    Result.y = XY.y;
-    Result.z = Z;
-
-    return(Result);
-}
-
-inline lane_v3
-operator*(f32 A, lane_v3 B)
-{
-    lane_v3 Result;
-    Result.x = A * B.x;
-    Result.y = A * B.y;
-    Result.z = A * B.z;
-    return(Result);
-}
-
-inline lane_v3
-operator*(lane_v3 B, f32 A)
-{
-    lane_v3 Result = A * B;
-    return(Result);
-}
-
-inline lane_v3 &
-operator*=(lane_v3 &B, f32 A)
-{
-    B = A * B;
-    return(B);
-}
-
-inline lane_v3
-operator/(lane_v3 B, f32 A)
-{
-    lane_v3 Result = (1.0f / A) * B;
-    return(Result);
-}
-
-inline lane_v3 &
-operator/=(lane_v3 &B, f32 A)
-{
-    B = B / A;
-    return(B);
-}
-
-inline lane_v3
-operator-(lane_v3 A)
-{
-    lane_v3 Result;
-    Result.x = -A.x;
-    Result.y = -A.y;
-    Result.z = -A.z;
-    return(Result);
-}
-
-inline lane_v3
-operator+(lane_v3 A, lane_v3 B)
-{
-    lane_v3 Result;
+    v3 Result;
     Result.x = A.x + B.x;
     Result.y = A.y + B.y;
     Result.z = A.z + B.z;
     return(Result);
 }
 
-inline lane_v3 &
-operator+=(lane_v3 &A, lane_v3 B)
+inline v3
+operator-(v3 A, v3 B)
 {
-    A = A + B;
-    return(A);
-}
-
-inline lane_v3
-operator-(lane_v3 A, lane_v3 B)
-{
-    lane_v3 Result;
+    v3 Result;
     Result.x = A.x - B.x;
     Result.y = A.y - B.y;
     Result.z = A.z - B.z;
     return(Result);
 }
 
-inline lane_v3 &
-operator-=(lane_v3 &A, lane_v3 B)
+internal v3
+operator*(v3 A, f32 B)
 {
-    A = A - B;
-    return(A);
-}
-
-inline lane_f32
-Inner(lane_v3 A, lane_v3 B)
-{
-    lane_f32 Result = A.x * B.x + A.y * B.y + A.z * B.z;
-    return(Result);
-}
-
-inline lane_f32
-LengthSq(lane_v3 A)
-{
-    lane_f32 Result = Inner(A, A);
-    return(Result);
-}
-
-inline lane_v3
-NOZ(lane_v3 A)
-{
-    lane_v3 Result = {};
-
-    lane_f32 LenSq = LengthSq(A);
-    lane_u32 Mask = LenSq > Square(0.0001f);
-    
-    ConditionalAssign(&Result, A * (1.0f / SquareRoot(LenSq)), Mask);
-
+    v3 Result;
+    Result.x = A.x * B;
+    Result.y = A.y * B;
+    Result.z = A.z * B;
     return Result;
 }
 
-inline lane_v3
-Hadamard(lane_v3 A, lane_v3 B)
+internal v3
+operator*(f32 A, v3 B)
 {
-    lane_v3 Result = {A.x * B.x, A.y * B.y, A.z * B.z};
-
-    return(Result);
+    return B * A;
 }
 
-inline lane_v3
-Cross(lane_v3 A, lane_v3 B)
-{
-    lane_v3 Result;
 
-    Result.x = A.y * B.z - A.z * B.y;
-    Result.y = A.z * B.x - A.x * B.z;
-    Result.z = A.x * B.y - A.y * B.x;
 
-    return(Result);
-}
 
-inline lane_v3
-Lerp(lane_v3 A, f32 t, lane_v3 B)
-{
-    lane_v3 Result = (1.0f - t) * A + t * B;
-    return(Result);
-}
 
-/******************************************************************/
-//              Color stuff
-/******************************************************************/
-
-inline lane_v3
-LaneV3(lane_f32 X, lane_f32 Y, lane_f32 Z)
-{
-    lane_v3 Result;
-
-    Result.x = X;
-    Result.y = Y;
-    Result.z = Z;
-
-    return(Result);
-}
-
-//inline lane_v3
-//Lerp(lane_v3 A, lane_f32 t, lane_v3 B)
-//{
-//    lane_v3 Result = (1.0f - t) * A + t * B;
-//    return(Result);
-//}
