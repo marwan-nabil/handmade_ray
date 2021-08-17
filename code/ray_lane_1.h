@@ -71,7 +71,7 @@ Min(lane_f32 A, lane_f32 B)
 internal lane_f32
 GatherF32_(void *BasePointer, u32 Stride, lane_u32 GatherIndex)
 {
-	return *(f32 *)((f32 *)BasePointer + GatherIndex * Stride);
+	return *(f32 *)((u8 *)BasePointer + GatherIndex * Stride);
 }
 
 /**********************************************************/

@@ -182,9 +182,13 @@ operator&(lane_u32 Mask, lane_v3 A)
 {
     lane_v3 Result;
 #if (SIMD_LANE_WIDTH == 1)
-    Result.x = (f32)(Mask & *(u32 *)&A.x);
-    Result.y = (f32)(Mask & *(u32 *)&A.y);
-    Result.z = (f32)(Mask & *(u32 *)&A.z);
+    Mask = Mask ? 0xffffffff : 0;
+    u32 X = (Mask & *(u32 *)&A.x);
+    u32 Y = (Mask & *(u32 *)&A.y);
+    u32 Z = (Mask & *(u32 *)&A.z);
+    Result.x = *(f32 *)&X;
+    Result.y = *(f32 *)&Y;
+    Result.z = *(f32 *)&Z;
 #elif (SIMD_LANE_WIDTH == 4)
     Result.x = Mask & A.x;
     Result.y = Mask & A.y;

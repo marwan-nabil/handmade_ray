@@ -1,7 +1,7 @@
 #pragma once
 
 #ifndef SIMD_LANE_WIDTH
-#define SIMD_LANE_WIDTH 4
+#define SIMD_LANE_WIDTH 1
 #endif
 
 #if (SIMD_LANE_WIDTH != 1 && SIMD_LANE_WIDTH != 4 && SIMD_LANE_WIDTH != 8)
