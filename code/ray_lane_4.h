@@ -148,7 +148,8 @@ SquareRoot(lane_f32 Value)
 internal void
 ConditionalAssign(lane_f32 *Destination, lane_f32 Source, lane_u32 Mask)
 {
-	__m128 MaskPS = _mm_cvtepi32_ps(Mask.V);
+	//__m128 MaskPS = _mm_cvtepi32_ps(Mask.V); // a bug
+	__m128 MaskPS = _mm_castsi128_ps(Mask.V);
 	Destination->V =
 		_mm_or_ps
 		(
@@ -269,7 +270,7 @@ internal lane_u32
 operator==(lane_u32 A, lane_u32 B)
 {
 	lane_u32 Result;
-	// TODO
+	Result.V = _mm_cmpeq_epi32(A.V, B.V);
 	return Result;
 }
 
@@ -277,8 +278,8 @@ internal lane_u32
 operator!=(lane_u32 A, lane_u32 B)
 {
 	lane_u32 Result;
-	// Note(Marwan): probably buggy
-	Result.V = _mm_xor_si128(_mm_cmpeq_epi32(A.V, B.V), _mm_setzero_si128());
+	//Result.V = _mm_xor_si128(_mm_cmpeq_epi32(A.V, B.V), _mm_setzero_si128()); // buggy
+	Result.V = _mm_xor_si128(_mm_cmpeq_epi32(A.V, B.V), _mm_set1_epi32(0xffffffff));
 	return Result;
 }
 

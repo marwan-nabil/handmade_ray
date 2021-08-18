@@ -214,8 +214,8 @@ internal lane_v3
 GatherV3_(void *BasePointer, u32 Stride, lane_u32 GatherIndices)
 {
     lane_v3 Result;
-    Result.x = GatherF32_((f32 *)BasePointer + 0, Stride, GatherIndices);
-    Result.y = GatherF32_((f32 *)BasePointer + 1, Stride, GatherIndices);
-    Result.z = GatherF32_((f32 *)BasePointer + 2, Stride, GatherIndices);
+    Result.x = GatherF32_((lane_f32 *)BasePointer + 0, Stride, GatherIndices);
+    Result.y = GatherF32_((lane_f32 *)BasePointer + 1, Stride, GatherIndices);
+    Result.z = GatherF32_((lane_f32 *)BasePointer + 2, Stride, GatherIndices);
     return Result;
 }

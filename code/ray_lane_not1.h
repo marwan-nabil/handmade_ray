@@ -40,7 +40,7 @@ operator+(f32 A, lane_f32 B)
     return Result;
 }
 
-internal lane_f32
+internal lane_f32 &
 operator+=(lane_f32 &LHS, lane_f32 RHS)
 {
     LHS = LHS + RHS;
@@ -64,11 +64,11 @@ operator-(f32 A, lane_f32 B)
 internal lane_f32
 operator-(lane_f32 B)
 {
-    lane_f32 Result = 0 - B;
+    lane_f32 Result = 0.0f - B;
     return Result;
 }
 
-internal lane_f32
+internal lane_f32 &
 operator-=(lane_f32 &LHS, lane_f32 RHS)
 {
     LHS = LHS - RHS;
@@ -89,7 +89,7 @@ operator*(f32 A, lane_f32 B)
     return Result;
 }
 
-internal lane_f32
+internal lane_f32 &
 operator*=(lane_f32 &LHS, lane_f32 RHS)
 {
     LHS = LHS * RHS;
@@ -110,13 +110,12 @@ operator/(f32 A, lane_f32 B)
     return Result;
 }
 
-internal lane_f32
+internal lane_f32 &
 operator/=(lane_f32 &LHS, lane_f32 RHS)
 {
     LHS = LHS / RHS;
     return LHS;
 }
-
 
 internal lane_u32
 operator>(lane_f32 A, f32 B)
@@ -157,28 +156,28 @@ lane_u32::operator=(u32 B)
     return *this;
 }
 
-internal lane_u32
+internal lane_u32 &
 operator^=(lane_u32 &LHS, lane_u32 RHS)
 {
     LHS = LHS ^ RHS;
     return LHS;
 }
 
-internal lane_u32
+internal lane_u32 &
 operator&=(lane_u32 &LHS, lane_u32 RHS)
 {
     LHS = LHS & RHS;
     return LHS;
 }
 
-internal lane_u32
+internal lane_u32 &
 operator|=(lane_u32 &LHS, lane_u32 RHS)
 {
     LHS = LHS | RHS;
     return LHS;
 }
 
-internal lane_u32
+internal lane_u32 &
 operator+=(lane_u32 &LHS, lane_u32 RHS)
 {
     LHS = LHS + RHS;
@@ -197,6 +196,7 @@ ConditionalAssign(lane_u32 *Destination, lane_u32 Source, lane_u32 Mask)
 /*                     Lane v3 Operations                 */
 /**********************************************************/
 
+// stopped inspection here
 inline lane_v3
 LaneV3(f32 X, f32 Y, f32 Z)
 {
