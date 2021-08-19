@@ -278,7 +278,6 @@ internal lane_u32
 operator!=(lane_u32 A, lane_u32 B)
 {
 	lane_u32 Result;
-	//Result.V = _mm_xor_si128(_mm_cmpeq_epi32(A.V, B.V), _mm_setzero_si128()); // buggy
 	Result.V = _mm_xor_si128(_mm_cmpeq_epi32(A.V, B.V), _mm_set1_epi32(0xffffffff));
 	return Result;
 }

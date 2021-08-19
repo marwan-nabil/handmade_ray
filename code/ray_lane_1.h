@@ -12,6 +12,13 @@ typedef u32 lane_u32;
 typedef f32 lane_f32;
 typedef v3 lane_v3;
 
+//struct lane_v3
+//{
+//	lane_f32 x;
+//	lane_f32 y;
+//	lane_f32 z;
+//};
+
 /**********************************************************/
 /*                      Forward Declarations              */
 /**********************************************************/

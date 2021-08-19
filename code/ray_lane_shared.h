@@ -104,7 +104,7 @@ operator-=(lane_v3 &A, lane_v3 B)
 inline lane_v3
 operator/(lane_v3 B, lane_f32 A)
 {
-    lane_v3 Result = (1.0f / A) * B;
+    lane_v3 Result = B * (1.0f / A);
     return(Result);
 }
 
@@ -208,14 +208,14 @@ HorizontalAdd(lane_v3 Lane)
     return Result;
 }
 
-#define GatherV3(BasePointer, GatherIndices, Member) GatherV3_(&(BasePointer)->Member, sizeof(*(BasePointer)), GatherIndices)
+#define GatherV3(BasePointer, GatherIndices, Member) GatherV3_(&((BasePointer)->Member), sizeof(*(BasePointer)), GatherIndices)
 
 internal lane_v3
-GatherV3_(void *BasePointer, u32 Stride, lane_u32 GatherIndices)
+GatherV3_(void *GatherBase, u32 Stride, lane_u32 GatherIndices)
 {
     lane_v3 Result;
-    Result.x = GatherF32_((lane_f32 *)BasePointer + 0, Stride, GatherIndices);
-    Result.y = GatherF32_((lane_f32 *)BasePointer + 1, Stride, GatherIndices);
-    Result.z = GatherF32_((lane_f32 *)BasePointer + 2, Stride, GatherIndices);
+    Result.x = GatherF32_((f32 *)GatherBase + 0, Stride, GatherIndices);
+    Result.y = GatherF32_((f32 *)GatherBase + 1, Stride, GatherIndices);
+    Result.z = GatherF32_((f32 *)GatherBase + 2, Stride, GatherIndices);
     return Result;
 }

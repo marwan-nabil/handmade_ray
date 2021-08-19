@@ -190,13 +190,10 @@ ConditionalAssign(lane_u32 *Destination, lane_u32 Source, lane_u32 Mask)
 	*Destination = AndNot(Mask, *Destination) | (Mask & Source);
 }
 
-
-
 /**********************************************************/
 /*                     Lane v3 Operations                 */
 /**********************************************************/
 
-// stopped inspection here
 inline lane_v3
 LaneV3(f32 X, f32 Y, f32 Z)
 {
