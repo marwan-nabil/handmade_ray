@@ -122,7 +122,7 @@ XorShift32(random_series *Series)
 internal lane_f32
 RandomUnilateral(random_series *Series)
 {
-    lane_f32 Result = LaneF32FromLaneU32(XorShift32(Series)) / LaneF32FromF32((f32)_UI32_MAX);
+    lane_f32 Result = LaneF32FromLaneU32(XorShift32(Series) >> 1) / LaneF32FromF32((f32)(_UI32_MAX >> 1));
     return Result;
 }
 
@@ -428,8 +428,8 @@ main(int ArgCount, char **Arguments)
     u32 TotalTileCount = TileCountX * TileCountY;
 
     work_queue Queue = {};
-    Queue.MaxBounceCount = 4;
-    Queue.RaysPerPixel = 16;
+    Queue.MaxBounceCount = 8;
+    Queue.RaysPerPixel = 512;
     Queue.WorkOrders = (work_order *)malloc(TotalTileCount * sizeof(work_order));
     if (!Queue.WorkOrders)
     {
