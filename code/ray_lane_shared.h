@@ -189,7 +189,7 @@ operator&(lane_u32 Mask, lane_v3 A)
     Result.x = *(f32 *)&X;
     Result.y = *(f32 *)&Y;
     Result.z = *(f32 *)&Z;
-#elif (SIMD_LANE_WIDTH == 4)
+#elif (SIMD_LANE_WIDTH != 1)
     Result.x = Mask & A.x;
     Result.y = Mask & A.y;
     Result.z = Mask & A.z;

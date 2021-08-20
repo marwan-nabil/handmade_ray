@@ -85,6 +85,7 @@ struct work_order
 struct work_queue
 {
     volatile u64 TotalBouncesComputed;
+    volatile u64 TotalLoopsComputed;
     volatile u64 TilesDone;
     volatile u64 NextWorkOrderIndex;
 
@@ -109,5 +110,6 @@ struct cast_state
 
     // out
     u64 BouncesComputed;
+    u64 LoopsComputed;
     v3 PixelColor;
 };

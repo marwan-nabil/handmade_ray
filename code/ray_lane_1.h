@@ -107,7 +107,7 @@ LaneU32FromU32(u32 A)
 }
 
 internal lane_u32
-LaneU32FromU32(u32 A, u32 B, u32 C, u32 D)
+LaneU32FromU32(u32 A, u32 B, u32 C, u32 D, u32 E, u32 F, u32 G, u32 H)
 {
 	return A;
 }

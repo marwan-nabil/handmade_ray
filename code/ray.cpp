@@ -160,6 +160,7 @@ CastPixelRays(cast_state *Input)
     lane_f32 Tolerance = LaneF32FromF32(0.00001f);
     lane_f32 MinHitDistance = LaneF32FromF32(0.001f);
     lane_u32 BouncesComputed = LaneU32FromU32(0);
+    u64 LoopsComputed = 0;
     lane_v3 PixelColor = {};
 
     for (u32 LaneIndex = 0; LaneIndex < LaneCount; LaneIndex++)
@@ -181,6 +182,7 @@ CastPixelRays(cast_state *Input)
             lane_v3 LastHitNormal = {};
             lane_u32 LaneIncrement = LaneU32FromU32(1);
             BouncesComputed += (LaneIncrement & LaneMask);
+            LoopsComputed += SIMD_LANE_WIDTH;
 
             lane_f32 HitDistance = LaneF32FromF32(F32MAX);
             lane_u32 HitMaterialIndex = LaneU32FromU32(0);
@@ -192,19 +194,25 @@ CastPixelRays(cast_state *Input)
                 plane Plane = World->Planes[PlaneIndex];
                 lane_v3 PlaneNormal = LaneV3FromV3(Plane.N);
                 lane_f32 PlaneDistance = LaneF32FromF32(Plane.d);
-                lane_u32 PlaneMaterialIndex = LaneU32FromU32(Plane.MaterialIndex);
 
                 lane_f32 Denominator = Inner(PlaneNormal, RayDirection);
                 lane_u32 DenomCheckMask = (Denominator < -Tolerance) | (Denominator > Tolerance);
 
-                lane_f32 T = (-PlaneDistance - Inner(PlaneNormal, RayOrigin)) / Denominator;
-                lane_u32 TCheckMask = (T > MinHitDistance) & (T < HitDistance);
+                if (!MaskIsZeroed(DenomCheckMask))
+                {
+                    lane_f32 T = (-PlaneDistance - Inner(PlaneNormal, RayOrigin)) / Denominator;
+                    lane_u32 TCheckMask = (T > MinHitDistance) & (T < HitDistance);
 
-                lane_u32 HitMask = TCheckMask & DenomCheckMask;
+                    lane_u32 HitMask = TCheckMask & DenomCheckMask;
 
-                ConditionalAssign(&HitDistance, T, HitMask);
-                ConditionalAssign(&HitMaterialIndex, PlaneMaterialIndex, HitMask);
-                ConditionalAssign(&LastHitNormal, PlaneNormal, HitMask);
+                    if (!MaskIsZeroed(HitMask))
+                    {
+                        lane_u32 PlaneMaterialIndex = LaneU32FromU32(Plane.MaterialIndex);
+                        ConditionalAssign(&HitDistance, T, HitMask);
+                        ConditionalAssign(&HitMaterialIndex, PlaneMaterialIndex, HitMask);
+                        ConditionalAssign(&LastHitNormal, PlaneNormal, HitMask);
+                    }
+                }
             }
 
             for (u32 SphereIndex = 0;
@@ -214,7 +222,6 @@ CastPixelRays(cast_state *Input)
                 sphere Sphere = World->Spheres[SphereIndex];
                 lane_v3 SpherePosition = LaneV3FromV3(Sphere.P);
                 lane_f32 SphereRadius = LaneF32FromF32(Sphere.r);
-                lane_u32 SphereMaterialIndex = LaneU32FromU32(Sphere.MaterialIndex);
 
                 lane_v3 SphereRelativeRayOrigin = RayOrigin - SpherePosition;
 
@@ -227,18 +234,25 @@ CastPixelRays(cast_state *Input)
                 lane_f32 RootTerm = SquareRoot(b * b - 4.0f * a * c);
                 lane_u32 RootTermCheckMask = (RootTerm > Tolerance);
 
-                lane_f32 TPos = (-b + RootTerm) / Denominator;
-                lane_f32 TNeg = (-b - RootTerm) / Denominator;
+                if (!MaskIsZeroed(RootTermCheckMask))
+                {
+                    lane_f32 TPos = (-b + RootTerm) / Denominator;
+                    lane_f32 TNeg = (-b - RootTerm) / Denominator;
 
-                lane_f32 T = TPos;
-                lane_u32 TPickMask = (TNeg > MinHitDistance) & (TNeg < TPos);
-                ConditionalAssign(&T, TNeg, TPickMask);
-                lane_u32 TCheckMask = (T > MinHitDistance) & (T < HitDistance);
+                    lane_f32 T = TPos;
+                    lane_u32 TPickMask = (TNeg > MinHitDistance) & (TNeg < TPos);
+                    ConditionalAssign(&T, TNeg, TPickMask);
+                    lane_u32 TCheckMask = (T > MinHitDistance) & (T < HitDistance);
 
-                lane_u32 HitMask = RootTermCheckMask & TCheckMask;
-                ConditionalAssign(&HitDistance, T, HitMask);
-                ConditionalAssign(&HitMaterialIndex, SphereMaterialIndex, HitMask);
-                ConditionalAssign(&LastHitNormal, NOZ(HitDistance * RayDirection + SphereRelativeRayOrigin), HitMask);
+                    if (!MaskIsZeroed(TCheckMask))
+                    {
+                        lane_u32 SphereMaterialIndex = LaneU32FromU32(Sphere.MaterialIndex);
+                        lane_u32 HitMask = RootTermCheckMask & TCheckMask;
+                        ConditionalAssign(&HitDistance, T, HitMask);
+                        ConditionalAssign(&HitMaterialIndex, SphereMaterialIndex, HitMask);
+                        ConditionalAssign(&LastHitNormal, NOZ(HitDistance * RayDirection + SphereRelativeRayOrigin), HitMask);
+                    }
+                }
             }
 
             lane_v3 MaterialEmmitColor = LaneMask & GatherV3(World->Materials, HitMaterialIndex, EmmitColor);
@@ -249,21 +263,23 @@ CastPixelRays(cast_state *Input)
 
             LaneMask &= (HitMaterialIndex != LaneU32FromU32(0));
 
-            lane_f32 CosineAttenuation = Max(Inner(-RayDirection, LastHitNormal), LaneF32FromF32(0.0f));
-
-            Attenuation = Hadamard(Attenuation, CosineAttenuation * MaterialReflectionColor);
-
-            RayOrigin += HitDistance * RayDirection;
-
-            lane_v3 PureBounce = RayDirection - 2.0f * Inner(RayDirection, LastHitNormal) * LastHitNormal;
-            lane_v3 RandomVector =
-                LaneV3(RandomBilateral(&EntropyState), RandomBilateral(&EntropyState), RandomBilateral(&EntropyState));
-            lane_v3 RandomBounce = NOZ(LastHitNormal + RandomVector);
-            RayDirection = NOZ(Lerp(RandomBounce, MaterialSpecular, PureBounce));
-
             if (MaskIsZeroed(LaneMask))
             {
                 break;
+            }
+            else
+            {
+                lane_f32 CosineAttenuation = Max(Inner(-RayDirection, LastHitNormal), LaneF32FromF32(0.0f));
+
+                Attenuation = Hadamard(Attenuation, CosineAttenuation * MaterialReflectionColor);
+
+                RayOrigin += HitDistance * RayDirection;
+
+                lane_v3 PureBounce = RayDirection - 2.0f * Inner(RayDirection, LastHitNormal) * LastHitNormal;
+                lane_v3 RandomVector =
+                    LaneV3(RandomBilateral(&EntropyState), RandomBilateral(&EntropyState), RandomBilateral(&EntropyState));
+                lane_v3 RandomBounce = NOZ(LastHitNormal + RandomVector);
+                RayDirection = NOZ(Lerp(RandomBounce, MaterialSpecular, PureBounce));
             }
         }
 
@@ -271,6 +287,7 @@ CastPixelRays(cast_state *Input)
     }
 
     Input->BouncesComputed += HorizontalAdd(BouncesComputed);
+    Input->LoopsComputed += LoopsComputed;
     Input->PixelColor = HorizontalAdd(PixelColor);
     Input->ThreadEntropy = EntropyState;
 }
@@ -298,6 +315,7 @@ RenderTile(work_queue *Queue)
 
     CastState.MaxBounceCount = Queue->MaxBounceCount;
     CastState.BouncesComputed = 0;
+    CastState.LoopsComputed = 0;
 
     CastState.RaysPerPixel = Queue->RaysPerPixel;
     CastState.HalfPixelWidth = 0.5f / (f32)Image->Width;
@@ -349,6 +367,7 @@ RenderTile(work_queue *Queue)
 
     LockedAdd_ReturnPrevious(&Queue->TilesDone, 1);
     LockedAdd_ReturnPrevious(&Queue->TotalBouncesComputed, CastState.BouncesComputed);
+    LockedAdd_ReturnPrevious(&Queue->TotalLoopsComputed, CastState.LoopsComputed);
 
     return true;
 }
@@ -429,7 +448,7 @@ main(int ArgCount, char **Arguments)
 
     work_queue Queue = {};
     Queue.MaxBounceCount = 8;
-    Queue.RaysPerPixel = 512;
+    Queue.RaysPerPixel = 32;
     Queue.WorkOrders = (work_order *)malloc(TotalTileCount * sizeof(work_order));
     if (!Queue.WorkOrders)
     {
@@ -474,7 +493,11 @@ main(int ArgCount, char **Arguments)
                     TileX * 12875 + TileY * 76534 + 484453,
                     TileX * 43367 + TileY * 33498 + 897542,
                     TileX * 39624 + TileY * 61239 + 543653,
-                    TileX * 74250 + TileY * 98340 + 856832
+                    TileX * 74250 + TileY * 98340 + 856832,
+                    TileX * 365127 + TileY * 718444 + 654535,
+                    TileX * 905515 + TileY * 109628 + 908235,
+                    TileX * 796211 + TileY * 822378 + 124632,
+                    TileX * 370718 + TileY * 358820 + 812348
                 )
             };
             WorkOrder->Entropy = Entropy;
@@ -503,9 +526,15 @@ main(int ArgCount, char **Arguments)
 
     clock_t EndTime = clock();
     u32 TotalDurationMs = (EndTime - StartTime);
+
+    u64 UsedBounces = Queue.TotalBouncesComputed;
+    u64 TotalBounces = Queue.TotalLoopsComputed;
+    u64 WastedBounces = Queue.TotalLoopsComputed - Queue.TotalBouncesComputed;
     
     printf("\n\tRaycasting took %dms\n", TotalDurationMs);
-    printf("\tBounces Computed %lld\n", Queue.TotalBouncesComputed);
+    printf("\tUsed Bounces %lld\n", UsedBounces);
+    printf("\tTotal bounces %lld\n", TotalBounces);
+    printf("\tWasted Bounces %lld (%0.2f%%)\n", WastedBounces, (f32)WastedBounces / (f32)TotalBounces * 100.0f);
     printf("\tperformance: %f ns/bounce\n", (f32)TotalDurationMs * 1000.0f * 1000.0f / (f32)Queue.TotalBouncesComputed);
     
     WriteImage((char *)"test.bmp", Image);
