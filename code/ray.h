@@ -33,16 +33,25 @@ struct image_u32
     u32 *Pixels;
 };
 
+struct brdf_table
+{
+    u32 Count[3];
+    v3 *Values;
+};
+
 struct material
 {
     f32 Specular; // 0 pure diffuse/chalky, 1 is pure specular/mirrory
     v3 ReflectionColor;
     v3 EmmitColor;
+    brdf_table BRDFTable;
 };
 
 struct plane
 {
-    v3 N;
+    v3 Normal;
+    v3 Tangent;
+    v3 BiNormal;
     f32 d;
     u32 MaterialIndex;
 };

@@ -73,6 +73,18 @@ struct v3
 };
 
 inline v3
+V3(f32 X, f32 Y, f32 Z)
+{
+    v3 Result;
+
+    Result.x = X;
+    Result.y = Y;
+    Result.z = Z;
+
+    return(Result);
+}
+
+inline v3
 operator+(v3 A, v3 B)
 {
     v3 Result;
