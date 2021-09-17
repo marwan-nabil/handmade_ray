@@ -7,6 +7,36 @@
 /******************************************************************/
 //              f32 stuff
 /******************************************************************/
+inline f32
+Min(f32 A, f32 B)
+{
+    f32 Result;
+    if (A < B)
+    {
+        Result = A;
+    }
+    else
+    {
+        Result = B;
+    }
+    return Result;
+}
+
+inline f32
+Max(f32 A, f32 B)
+{
+    f32 Result;
+    if (A > B)
+    {
+        Result = A;
+    }
+    else
+    {
+        Result = B;
+    }
+    return Result;
+}
+
 inline u32
 RoundF32ToU32(f32 F)
 {
@@ -34,6 +64,13 @@ SquareRoot(f32 A)
 {
     f32 Result = (f32)sqrt(A);
     return(Result);
+}
+
+inline f32
+Clamp01(f32 Value)
+{
+    f32 Result = Min(Max(Value, 0.0f), 1.0f);
+    return Result;
 }
 
 /******************************************************************/

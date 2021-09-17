@@ -173,6 +173,7 @@ GatherF32_(void *BasePointer, u32 Stride, lane_u32 GatherIndices)
 	return Result;
 }
 
+
 /**********************************************************/
 /*                     Lane u32 Operations                */
 /**********************************************************/

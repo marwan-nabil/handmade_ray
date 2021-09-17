@@ -12,7 +12,6 @@
 #include "ray.h"
 #include "ray_math.h"
 
-
 #include "ray_lane_8.h"
 #include "ray_lane_4.h"
 #include "ray_lane_1.h"

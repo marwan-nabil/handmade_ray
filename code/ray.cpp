@@ -137,8 +137,6 @@ internal lane_v3
 RDFLookUp(material *Materials, lane_u32 MaterialIndex, lane_v3 IncidenceDirection, lane_v3 SamplingDirection,
           lane_v3 SurfaceNormal, lane_v3 SurfaceTangent, lane_v3 SurfaceBiNormal)
 {
-    lane_v3 Result;
-
     lane_v3 HalfDirection = (IncidenceDirection + SamplingDirection) * LaneF32FromF32(0.5f);
     HalfDirection = NOZ(HalfDirection);
 
@@ -152,18 +150,45 @@ RDFLookUp(material *Materials, lane_u32 MaterialIndex, lane_v3 IncidenceDirectio
     HalfDirectionRemapped.y = Inner(HalfDirection, SurfaceBiNormal);
     HalfDirectionRemapped.z = Inner(HalfDirection, SurfaceNormal);
 
-    for (u32 SubIndex = 0; SubIndex = SIMD_LANE_WIDTH; SubIndex++)
+    lane_v3 DiffY = NOZ(Cross(HalfDirectionRemapped, SurfaceTangent));
+    lane_v3 DiffX = NOZ(Cross(DiffY, HalfDirectionRemapped));
+
+    lane_f32 DiffXInner = Inner(DiffX, IncidenceDirectionRemapped);
+    lane_f32 DiffYInner = Inner(DiffY, IncidenceDirectionRemapped);
+    lane_f32 DiffZInner = Inner(HalfDirectionRemapped, IncidenceDirectionRemapped);
+
+    lane_v3 Result;
+
+    for (u32 SubIndex = 0; SubIndex == SIMD_LANE_WIDTH; SubIndex++)
     {
-        v3 IncidenceDirectionRemappedSingleLane = ExtractN(IncidenceDirectionRemapped, SubIndex);
-        v3 HalfDirectionRemappedSingleLane = ExtractN(HalfDirectionRemapped, SubIndex);
+        f32 ThetaHalf = acosf(ExtractF32(HalfDirectionRemapped.z, SubIndex));
+        f32 ThetaDiff = acosf(ExtractF32(DiffZInner, SubIndex));
+        f32 PhiDiff = atan2f(ExtractF32(DiffYInner, SubIndex), ExtractF32(DiffXInner, SubIndex));
 
-        f32 ThetaIncidenceDirectionRemappedSingleLane = acos(IncidenceDirectionRemappedSingleLane.z);
-        f32 ThetaHalfDirectionRemappedSingleLane = acos(HalfDirectionRemappedSingleLane.z);
-        f32 ThetaDiff = ThetaIncidenceDirectionRemappedSingleLane - ThetaHalfDirectionRemappedSingleLane;
+        if (PhiDiff < 0)
+        {
+            PhiDiff += Pi32;
+        }
 
-        f32 PhiIncidenceDirectionRemappedSingleLane = atan2(IncidenceDirectionRemappedSingleLane.y, IncidenceDirectionRemappedSingleLane.x);
-        f32 PhiHalfDirectionRemappedSingleLane = atan2(HalfDirectionRemappedSingleLane.y, HalfDirectionRemappedSingleLane.x);
-        f32 PhiDiff = PhiIncidenceDirectionRemappedSingleLane - PhiHalfDirectionRemappedSingleLane;
+        brdf_table *Table = &Materials[((u32 *)&MaterialIndex)[SubIndex]].BRDFTable;
+        
+        f32 F0 = SquareRoot(Clamp01(ThetaHalf / (0.5f * Pi32)));
+        u32 I0 = RoundF32ToU32((Table->Count[0] - 1) * F0);
+
+        f32 F1 = Clamp01(ThetaDiff / (0.5f * Pi32));
+        u32 I1 = RoundF32ToU32((Table->Count[1] - 1) * F1);
+
+        f32 F2 = Clamp01(PhiDiff / (Pi32));
+        u32 I2 = RoundF32ToU32((Table->Count[2] - 1) * F2);
+
+        u32 Index = I2 + I1 * Table->Count[2] + I0 * Table->Count[1] * Table->Count[2];
+
+        Assert(Index < (Table->Count[0] * Table->Count[1] * Table->Count[2]));
+        v3 Color = Table->Values[Index];
+
+        ((f32 *)&Result.x)[SubIndex] = Color.x;
+        ((f32 *)&Result.y)[SubIndex] = Color.y;
+        ((f32 *)&Result.z)[SubIndex] = Color.z;
     }
 
     return Result;
@@ -326,7 +351,6 @@ CastPixelRays(cast_state *Input)
                 lane_v3 RandomBounce = NOZ(LastHitNormal + RandomVector);
                 lane_v3 NextRayDirection = NOZ(Lerp(RandomBounce, MaterialSpecular, PureBounce));
 
-                //lane_f32 CosineAttenuation = Max(Inner(-RayDirection, LastHitNormal), LaneF32FromF32(0.0f));
                 lane_v3 RefC = RDFLookUp(World->Materials, HitMaterialIndex,
                                          -RayDirection, NextRayDirection, 
                                          LastHitNormal, LastHitTangent, LastHitBiNormal);
@@ -479,6 +503,15 @@ LoadMERLBRDF(char *FileName, brdf_table *Destination)
     free(Temp);
 }
 
+global v3 NullBRDFValue = {0, 0, 0};
+
+internal void
+NullBRDF(brdf_table *Table)
+{
+    Table->Count[0] = Table->Count[1] = Table->Count[2] = 1;
+    Table->Values = &NullBRDFValue;
+}
+
 int
 main(int ArgCount, char **Arguments)
 {
@@ -494,6 +527,7 @@ main(int ArgCount, char **Arguments)
         {1.0f, {0.95f, 0.95f, 0.95f}, {}} // 6
     };
 
+    NullBRDF(&Materials[0].BRDFTable);
     LoadMERLBRDF((char *)"merl/red-fabric.binary", &Materials[1].BRDFTable);
     LoadMERLBRDF((char *)"merl/chrome.binary", &Materials[2].BRDFTable);
 
