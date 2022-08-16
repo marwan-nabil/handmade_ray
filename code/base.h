@@ -18,10 +18,5 @@ typedef double f64;
 typedef i32 b32;
 typedef i32 b32x;
 
-#define F32MAX FLT_MAX
-#define F32MIN -FLT_MAX
-#define Pi32 3.14159265359f
-#define Tau32 6.28318530717958647692f
-
 #define Assert(Expression) {if(!(Expression)){ *(int *)0 = 0; }}
 #define ArraySize(arr) (sizeof(arr) / sizeof((arr)[0]))

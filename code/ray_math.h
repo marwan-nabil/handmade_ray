@@ -1,12 +1,16 @@
 #pragma once
 
-#include <float.h>
 #include <math.h>
-#include "base.h"
+#include <float.h>
 
-/******************************************************************/
-//              f32 stuff
-/******************************************************************/
+#define F32MAX FLT_MAX
+#define F32MIN -FLT_MAX
+#define Pi32 3.14159265359f
+
+/*********************************************************************/
+/*                                Scalars                            */
+/*********************************************************************/
+
 inline f32
 Min(f32 A, f32 B)
 {
@@ -73,18 +77,19 @@ Clamp01(f32 Value)
     return Result;
 }
 
-/******************************************************************/
-//              V2 stuff
-/******************************************************************/
+/*********************************************************************/
+/*                                V2                                 */
+/*********************************************************************/
+
 union v2
 {
     struct
     {
-        f32 x, y;
+        f32 X, Y;
     };
     struct
     {
-        f32 u, v;
+        f32 U, V;
     };
     f32 E[2];
 };
@@ -94,19 +99,98 @@ V2(f32 X, f32 Y)
 {
     v2 Result;
 
-    Result.x = X;
-    Result.y = Y;
+    Result.X = X;
+    Result.Y = Y;
 
     return(Result);
 }
 
-/******************************************************************/
-//              v3 stuff
-/******************************************************************/
+inline v2
+operator+(v2 A, v2 B)
+{
+    v2 Result;
+    Result.X = A.X + B.X;
+    Result.Y = A.Y + B.Y;
+    return(Result);
+}
+
+inline v2
+operator-(v2 A, v2 B)
+{
+    v2 Result;
+    Result.X = A.X - B.X;
+    Result.Y = A.Y - B.Y;
+    return(Result);
+}
+
+inline v2
+operator-(v2 A)
+{
+    v2 Result;
+
+    Result.X = -A.X;
+    Result.Y = -A.Y;
+
+    return(Result);
+}
+
+inline v2
+operator*(v2 A, f32 B)
+{
+    v2 Result;
+    Result.X = A.X * B;
+    Result.Y = A.Y * B;
+    return Result;
+}
+
+inline v2
+operator*(f32 A, v2 B)
+{
+    return B * A;
+}
+
+inline f32
+InnerProduct(v2 A, v2 B)
+{
+    f32 Result = (A.X * B.X) + (A.Y * B.Y);
+    return(Result);
+}
+
+inline v2
+HadamardProduct(v2 A, v2 B)
+{
+    v2 Result = V2(A.X * B.X, A.Y * B.Y);
+    return(Result);
+}
+
+inline f32
+LengthSquare(v2 A)
+{
+    f32 Result = InnerProduct(A, A);
+    return(Result);
+}
+
+inline v2
+NormalizeToZero(v2 A)
+{
+    v2 Result = {};
+
+    f32 LengthSquared = LengthSquare(A);
+    if (LengthSquared > Square(0.0001f))
+    {
+        Result = A * (1.0f / SquareRoot(LengthSquared));
+    }
+
+    return Result;
+}
+
+/*********************************************************************/
+/*                                V3                                 */
+/*********************************************************************/
 
 struct v3
 {
-    f32 x, y, z;
+    f32 X, Y, Z;
 };
 
 inline v3
@@ -114,9 +198,9 @@ V3(f32 X, f32 Y, f32 Z)
 {
     v3 Result;
 
-    Result.x = X;
-    Result.y = Y;
-    Result.z = Z;
+    Result.X = X;
+    Result.Y = Y;
+    Result.Z = Z;
 
     return(Result);
 }
@@ -125,9 +209,9 @@ inline v3
 operator+(v3 A, v3 B)
 {
     v3 Result;
-    Result.x = A.x + B.x;
-    Result.y = A.y + B.y;
-    Result.z = A.z + B.z;
+    Result.X = A.X + B.X;
+    Result.Y = A.Y + B.Y;
+    Result.Z = A.Z + B.Z;
     return(Result);
 }
 
@@ -135,29 +219,126 @@ inline v3
 operator-(v3 A, v3 B)
 {
     v3 Result;
-    Result.x = A.x - B.x;
-    Result.y = A.y - B.y;
-    Result.z = A.z - B.z;
+    Result.X = A.X - B.X;
+    Result.Y = A.Y - B.Y;
+    Result.Z = A.Z - B.Z;
     return(Result);
 }
 
-internal v3
+inline v3
+operator-(v3 A)
+{
+    v3 Result;
+
+    Result.X = -A.X;
+    Result.Y = -A.Y;
+    Result.Z = -A.Z;
+
+    return(Result);
+}
+
+inline v3
 operator*(v3 A, f32 B)
 {
     v3 Result;
-    Result.x = A.x * B;
-    Result.y = A.y * B;
-    Result.z = A.z * B;
+    Result.X = A.X * B;
+    Result.Y = A.Y * B;
+    Result.Z = A.Z * B;
     return Result;
 }
 
-internal v3
+inline v3
 operator*(f32 A, v3 B)
 {
     return B * A;
 }
 
+inline f32
+InnerProduct(v3 A, v3 B)
+{
+    f32 Result = (A.X * B.X) + (A.Y * B.Y) + (A.Z * B.Z);
+    return(Result);
+}
 
+inline v3
+HadamardProduct(v3 A, v3 B)
+{
+    v3 Result = V3(A.X * B.X, A.Y * B.Y, A.Z * B.Z);
+    return(Result);
+}
 
+inline v3
+CrossProduct(v3 A, v3 B)
+{
+    v3 Result;
 
+    Result.X = A.Y * B.Z - A.Z * B.Y;
+    Result.Y = A.Z * B.X - A.X * B.Z;
+    Result.Z = A.X * B.Y - A.Y * B.X;
 
+    return(Result);
+}
+
+inline f32
+LengthSquare(v3 A)
+{
+    f32 Result = InnerProduct(A, A);
+    return(Result);
+}
+
+inline v3
+NormalizeToZero(v3 A)
+{
+    v3 Result = {};
+
+    f32 LengthSquared = LengthSquare(A);
+    if (LengthSquared > Square(0.0001f))
+    {
+        Result = A * (1.0f / SquareRoot(LengthSquared));
+    }
+
+    return Result;
+}
+
+/*********************************************************************/
+/*                                V4                                 */
+/*********************************************************************/
+
+union v4
+{
+    struct
+    {
+        f32 X, Y, Z, W;
+    };
+    struct
+    {
+        f32 Red, Green, Blue, Alpha;
+    };
+    f32 E[4];
+};
+
+inline v4
+V4(f32 X, f32 Y, f32 Z, f32 W)
+{
+    v4 Result;
+
+    Result.X = X;
+    Result.Y = Y;
+    Result.Z = Z;
+    Result.W = W;
+
+    return Result;
+}
+
+inline v4
+V4(v3 XYZ, f32 W)
+{
+    v4 Result;
+
+    Result.X = XYZ.X;
+    Result.Y = XYZ.Y;
+    Result.Z = XYZ.Z;
+    Result.W = W;
+
+    return Result;
+}
