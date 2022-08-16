@@ -58,7 +58,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\code\main.cpp" />
+    <ClCompile Include="..\code\ray.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\code\base.h" />
@@ -66,6 +66,8 @@
     <ClInclude Include="..\code\ray.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\scripts\build.bat" />
+    <None Include="..\scripts\clean.bat" />
     <None Include="..\scripts\run.bat" />
     <None Include="..\scripts\startup.bat" />
   </ItemGroup>

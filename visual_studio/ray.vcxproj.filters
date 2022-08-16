@@ -14,7 +14,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\code\main.cpp">
+    <ClCompile Include="..\code\ray.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -34,6 +34,12 @@
       <Filter>Scripts</Filter>
     </None>
     <None Include="..\scripts\run.bat">
+      <Filter>Scripts</Filter>
+    </None>
+    <None Include="..\scripts\build.bat">
+      <Filter>Scripts</Filter>
+    </None>
+    <None Include="..\scripts\clean.bat">
       <Filter>Scripts</Filter>
     </None>
   </ItemGroup>
