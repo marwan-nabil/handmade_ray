@@ -49,7 +49,7 @@ RoundF32ToU32(f32 F)
 }
 
 inline f32
-Pow(f32 A, f32 B)
+Power(f32 A, f32 B)
 {
     f32 Result = (f32)pow(A, B);
     return(Result);
@@ -75,6 +75,32 @@ Clamp01(f32 Value)
 {
     f32 Result = Min(Max(Value, 0.0f), 1.0f);
     return Result;
+}
+
+internal f32
+ExactLinearToSRGB(f32 LinearColor)
+{
+    f32 sRGB;
+
+    if (LinearColor < 0.0f)
+    {
+        LinearColor = 0.0f;
+    }
+    else if (LinearColor > 1.0f)
+    {
+        LinearColor = 1.0f;
+    }
+
+    if (LinearColor > 0.0031308f)
+    {
+        sRGB = 1.055f * Power(LinearColor, 1.0f / 2.4f) - 0.055f;
+    }
+    else
+    {
+        sRGB = LinearColor * 12.92f;
+    }
+    
+    return sRGB;
 }
 
 /*********************************************************************/
@@ -184,13 +210,27 @@ NormalizeToZero(v2 A)
     return Result;
 }
 
+inline v2
+Lerp(v2 A, v2 B, f32 T)
+{
+    v2 Result = (1.0f - T) * A + T * B;
+    return(Result);
+}
+
 /*********************************************************************/
 /*                                V3                                 */
 /*********************************************************************/
 
-struct v3
+union v3
 {
-    f32 X, Y, Z;
+    struct
+    {
+        f32 X, Y, Z;
+    };
+    struct
+    {
+        f32 Red, Green, Blue;
+    };
 };
 
 inline v3
@@ -300,6 +340,13 @@ NormalizeToZero(v3 A)
     return Result;
 }
 
+inline v3
+Lerp(v3 A, v3 B, f32 T)
+{
+    v3 Result = (1.0f - T) * A + T * B;
+    return(Result);
+}
+
 /*********************************************************************/
 /*                                V4                                 */
 /*********************************************************************/
@@ -340,5 +387,16 @@ V4(v3 XYZ, f32 W)
     Result.Z = XYZ.Z;
     Result.W = W;
 
+    return Result;
+}
+
+inline v4
+LinearColor1ToSRGB255(v4 LinearColor)
+{
+    v4 Result;
+    Result.Red = 255.0f * SquareRoot(LinearColor.Red);
+    Result.Green = 255.0f * SquareRoot(LinearColor.Green);
+    Result.Blue = 255.0f * SquareRoot(LinearColor.Blue);
+    Result.Alpha = 255.0f * LinearColor.Alpha;
     return Result;
 }

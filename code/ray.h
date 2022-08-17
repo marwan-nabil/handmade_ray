@@ -31,6 +31,7 @@ struct image_u32
 
 struct material
 {
+    f32 Specularity;
     v3 EmmissionColor;
     v3 ReflectionColor;
 };
