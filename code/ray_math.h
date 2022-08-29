@@ -211,7 +211,7 @@ NormalizeToZero(v2 A)
 }
 
 inline v2
-Lerp(v2 A, v2 B, f32 T)
+LinearInterpolation(v2 A, v2 B, f32 T)
 {
     v2 Result = (1.0f - T) * A + T * B;
     return(Result);
@@ -341,7 +341,7 @@ NormalizeToZero(v3 A)
 }
 
 inline v3
-Lerp(v3 A, v3 B, f32 T)
+LinearInterpolation(v3 A, v3 B, f32 T)
 {
     v3 Result = (1.0f - T) * A + T * B;
     return(Result);
