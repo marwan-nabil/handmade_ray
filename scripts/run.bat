@@ -1,6 +1,6 @@
 @echo off
 
-pushd F:\ray\data
+pushd W:\handmade_ray\data
     ..\build\ray.exe %*
     start test.bmp
 popd
